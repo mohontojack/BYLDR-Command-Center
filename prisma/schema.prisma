@@ -1,0 +1,283 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== ENUMS ====================
+
+// User roles for the agency
+enum UserRole {
+  ADMIN
+  CSO
+  TECH_LEAD
+  CONTRACTOR
+}
+
+// Lead funnel stages (14-day funnel system)
+enum FunnelStage {
+  AWARENESS
+  DISCOVERY
+  EVALUATION
+  ASSESSMENT
+  PURCHASE
+  LOYALTY
+}
+
+// Lead status
+enum LeadStatus {
+  ACTIVE
+  WON
+  LOST
+  ARCHIVED
+}
+
+// Task status
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+// Task priority
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+// Activity types for tracking lead interactions
+enum ActivityType {
+  LEAD_CREATED
+  STAGE_CHANGED
+  EMAIL_SENT
+  EMAIL_OPENED
+  EMAIL_REPLIED
+  SMS_SENT
+  SMS_REPLIED
+  CALL_MADE
+  CALL_COMPLETED
+  LINK_CLICKED
+  FORM_SUBMITTED
+  VIDEO_VIEWED
+  NOTE_ADDED
+  TASK_CREATED
+  TASK_COMPLETED
+  TASK_ASSIGNED
+  AUTOMATION_TRIGGERED
+  FUNNEL_DAY_ADVANCED
+}
+
+// Notification types
+enum NotificationType {
+  LEAD_ASSIGNED
+  STAGE_CHANGE
+  TASK_DUE
+  TASK_OVERDUE
+  LEAD_ENGAGEMENT
+  AUTOMATION_ALERT
+  DAILY_SUMMARY
+  SYSTEM
+}
+
+// Automation trigger types
+enum TriggerType {
+  LEAD_CREATED
+  STAGE_CHANGED
+  EMAIL_OPENED
+  EMAIL_REPLIED
+  LINK_CLICKED
+  SMS_REPLIED
+  CALL_COMPLETED
+  FORM_SUBMITTED
+  DAYS_IN_FUNNEL
+  TASK_OVERDUE
+  LEAD_INACTIVE
+}
+
+// ==================== MODELS ====================
+
+// Team members
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  role      UserRole @default(CONTRACTOR)
+  avatar    String?
+  phone     String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  assignedLeads    Lead[]
+  assignedTasks    Task[]
+  activities       Activity[]
+  notifications    Notification[]
+  createdLeads     Lead[]  @relation("LeadCreator")
+  createdTasks     Task[]  @relation("TaskCreator")
+
+  @@map("users")
+}
+
+// Lead / Prospect management
+model Lead {
+  id            String      @id @default(cuid())
+  firstName     String
+  lastName      String
+  email         String?
+  phone         String?
+  company       String?
+  source        String      @default("NXL BYLDR")  // NXL BYLDR, CA BYLDRS, BYLDRS GUARDIAN, REFERRAL, ORGANIC
+  funnelStage   FunnelStage @default(AWARENESS)
+  previousStage FunnelStage?
+  status        LeadStatus  @default(ACTIVE)
+  dayInFunnel   Int         @default(1)  // Day 1-14 in the funnel sequence
+  score         Int         @default(0)   // Lead score 0-100
+  tags          String      @default("")   // Comma-separated tags
+  notes         String?
+  assignedToId  String?
+  createdById   String?
+
+  // Funnel timeline tracking
+  enteredAwarenessAt   DateTime @default(now())
+  enteredDiscoveryAt   DateTime?
+  enteredEvaluationAt  DateTime?
+  enteredAssessmentAt  DateTime?
+  enteredPurchaseAt    DateTime?
+  enteredLoyaltyAt     DateTime?
+  closedAt             DateTime?
+
+  // Mirror funnel tracking
+  lastEngagementAt DateTime?
+  lastContactAt    DateTime?
+  nextActionDate   DateTime?
+  nextActionType   String?    // "call", "email", "sms"
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  assignedTo  User?       @relation(fields: [assignedToId], references: [id])
+  createdBy   User?       @relation("LeadCreator", fields: [createdById], references: [id])
+  tasks       Task[]
+  activities  Activity[]
+  notifications Notification[]
+
+  @@index([funnelStage])
+  @@index([status])
+  @@index([assignedToId])
+  @@index([dayInFunnel])
+  @@index([score])
+  @@map("leads")
+}
+
+// Task management
+model Task {
+  id          String       @id @default(cuid())
+  title       String
+  description String?
+  status      TaskStatus   @default(PENDING)
+  priority    TaskPriority @default(MEDIUM)
+  type        String       @default("follow_up") // follow_up, call, email, research, admin, automation
+
+  assignedToId String?
+  createdById  String?
+  leadId       String?
+
+  dueDate      DateTime?
+  completedAt  DateTime?
+  reminderAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  assignedTo  User?  @relation(fields: [assignedToId], references: [id])
+  createdBy   User?  @relation("TaskCreator", fields: [createdById], references: [id])
+  lead        Lead?  @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  activities  Activity[]
+
+  @@index([status])
+  @@index([priority])
+  @@index([assignedToId])
+  @@index([dueDate])
+  @@index([leadId])
+  @@map("tasks")
+}
+
+// Activity timeline (audit log)
+model Activity {
+  id          String       @id @default(cuid())
+  type        ActivityType
+  description String
+  metadata    String?      @default("{}")  // JSON string for extra data
+
+  leadId String?
+  userId String?
+  taskId String?
+
+  createdAt DateTime @default(now())
+
+  // Relationships
+  lead   Lead?  @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  user   User?  @relation(fields: [userId], references: [id])
+  task   Task?  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([type])
+  @@index([leadId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("activities")
+}
+
+// Notification system
+model Notification {
+  id        String           @id @default(cuid())
+  type      NotificationType
+  title     String
+  message   String
+  read      Boolean          @default(false)
+  readAt    DateTime?
+
+  userId String?
+  leadId String?
+
+  actionUrl String?  // Deep link to relevant page
+
+  createdAt DateTime @default(now())
+
+  // Relationships
+  user User?  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lead Lead?  @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([read])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+// Automation workflows
+model Automation {
+  id          String      @id @default(cuid())
+  name        String
+  description String?
+  enabled     Boolean     @default(true)
+
+  // Trigger configuration
+  triggerType     TriggerType
+  triggerConfig   String      @default("{}")  // JSON: { stage?: string, daysInFunnel?: number, inactivityDays?: number }
+
+  // Actions to execute (JSON array)
+  actions     String      // JSON: [{ type: "assign_task", config: {...} }, { type: "send_notification", config: {...} }, ...]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("automations")
+}
