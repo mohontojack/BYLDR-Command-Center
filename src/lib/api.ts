@@ -2,7 +2,7 @@
  * API Hooks Layer
  *
  * Clean, typed fetch wrappers for all backend API endpoints.
- * Uses native fetch API with consistent error handling.
+ * Uses native fetch API with consistent error handling and auth token management.
  */
 
 import type {
@@ -32,6 +32,25 @@ import type {
   SeedResponse,
 } from '@/lib/types';
 
+// ==================== TOKEN MANAGEMENT ====================
+
+let authToken: string | null = null;
+
+/**
+ * Set the auth token for API requests (stored in memory).
+ * Called after login. The token is also sent via httpOnly cookie by the server.
+ */
+export function setAuthToken(token: string | null) {
+  authToken = token;
+}
+
+/**
+ * Get the current auth token.
+ */
+export function getAuthToken(): string | null {
+  return authToken;
+}
+
 // ==================== ERROR HANDLING ====================
 
 class ApiError extends Error {
@@ -46,6 +65,15 @@ class ApiError extends Error {
 
 async function handleResponse<T>(response: Response, endpoint: string): Promise<T> {
   if (!response.ok) {
+    // Handle 401 - session expired
+    if (response.status === 401) {
+      // Clear client state and trigger logout
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('bldr_user');
+        localStorage.removeItem('bldr_token');
+        window.location.reload();
+      }
+    }
     let message = `API error at ${endpoint}: ${response.status} ${response.statusText}`;
     try {
       const body = await response.json();
@@ -58,6 +86,17 @@ async function handleResponse<T>(response: Response, endpoint: string): Promise<
     throw new ApiError(response.status, message);
   }
   return response.json() as Promise<T>;
+}
+
+function authHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  // Include Authorization header (server also checks cookie)
+  if (authToken) {
+    headers['Authorization'] = `Bearer ${authToken}`;
+  }
+  return headers;
 }
 
 function buildUrl(path: string, params?: Record<string, string | number | boolean | undefined>): string {
@@ -74,10 +113,6 @@ function buildUrl(path: string, params?: Record<string, string | number | boolea
 
 // ==================== LEADS ====================
 
-/**
- * Fetch leads with optional filtering and sorting.
- * Maps to: GET /api/leads
- */
 export async function fetchLeads(
   params?: {
     stage?: FunnelStage | 'ALL';
@@ -104,20 +139,12 @@ export async function fetchLeads(
   return handleResponse<LeadsResponse>(res, 'GET /api/leads');
 }
 
-/**
- * Fetch a single lead by ID with activities, tasks, and notifications.
- * Maps to: GET /api/leads/[id]
- */
 export async function fetchLead(id: string): Promise<Lead> {
   const res = await fetch(`/api/leads/${id}`);
   const data = await handleResponse<LeadResponse>(res, `GET /api/leads/${id}`);
   return data.lead;
 }
 
-/**
- * Create a new lead.
- * Maps to: POST /api/leads
- */
 export async function createLead(
   data: {
     firstName: string;
@@ -132,34 +159,27 @@ export async function createLead(
 ): Promise<Lead> {
   const res = await fetch('/api/leads', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders(),
     body: JSON.stringify(data),
   });
   const result = await handleResponse<LeadResponse>(res, 'POST /api/leads');
   return result.lead;
 }
 
-/**
- * Update an existing lead. Requires `id` in the data.
- * Maps to: PUT /api/leads
- */
 export async function updateLead(id: string, data: Partial<Lead>): Promise<Lead> {
   const res = await fetch('/api/leads', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders(),
     body: JSON.stringify({ id, ...data }),
   });
   const result = await handleResponse<LeadResponse>(res, 'PUT /api/leads');
   return result.lead;
 }
 
-/**
- * Archive a lead (sets status to ARCHIVED).
- * Maps to: DELETE /api/leads?id=<id>
- */
 export async function archiveLead(id: string): Promise<Lead> {
   const res = await fetch(`/api/leads?id=${id}`, {
     method: 'DELETE',
+    headers: authHeaders(),
   });
   const result = await handleResponse<LeadResponse>(res, `DELETE /api/leads?id=${id}`);
   return result.lead;
@@ -167,10 +187,6 @@ export async function archiveLead(id: string): Promise<Lead> {
 
 // ==================== TASKS ====================
 
-/**
- * Fetch tasks with optional filtering.
- * Maps to: GET /api/tasks
- */
 export async function fetchTasks(
   params?: {
     status?: TaskStatus | 'ALL';
@@ -195,20 +211,12 @@ export async function fetchTasks(
   return handleResponse<TasksResponse>(res, 'GET /api/tasks');
 }
 
-/**
- * Fetch a single task by ID with activities and related data.
- * Maps to: GET /api/tasks/[id]
- */
 export async function fetchTask(id: string): Promise<Task> {
   const res = await fetch(`/api/tasks/${id}`);
   const data = await handleResponse<TaskResponse>(res, `GET /api/tasks/${id}`);
   return data.task;
 }
 
-/**
- * Create a new task.
- * Maps to: POST /api/tasks
- */
 export async function createTask(
   data: {
     title: string;
@@ -222,21 +230,17 @@ export async function createTask(
 ): Promise<Task> {
   const res = await fetch('/api/tasks', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders(),
     body: JSON.stringify(data),
   });
   const result = await handleResponse<TaskResponse>(res, 'POST /api/tasks');
   return result.task;
 }
 
-/**
- * Update an existing task. Requires `id` in the data.
- * Maps to: PUT /api/tasks
- */
 export async function updateTask(id: string, data: Partial<Task>): Promise<Task> {
   const res = await fetch('/api/tasks', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders(),
     body: JSON.stringify({ id, ...data }),
   });
   const result = await handleResponse<TaskResponse>(res, 'PUT /api/tasks');
@@ -245,10 +249,6 @@ export async function updateTask(id: string, data: Partial<Task>): Promise<Task>
 
 // ==================== ACTIVITIES ====================
 
-/**
- * Fetch activities with optional filtering and pagination.
- * Maps to: GET /api/activities
- */
 export async function fetchActivities(
   params?: {
     leadId?: string;
@@ -270,10 +270,6 @@ export async function fetchActivities(
   return handleResponse<ActivitiesResponse>(res, 'GET /api/activities');
 }
 
-/**
- * Create a new activity log entry.
- * Maps to: POST /api/activities
- */
 export async function createActivity(
   data: {
     type: string;
@@ -286,7 +282,7 @@ export async function createActivity(
 ): Promise<Activity> {
   const res = await fetch('/api/activities', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders(),
     body: JSON.stringify(data),
   });
   const result = await handleResponse<ActivityResponse>(res, 'POST /api/activities');
@@ -295,10 +291,6 @@ export async function createActivity(
 
 // ==================== NOTIFICATIONS ====================
 
-/**
- * Fetch notifications for a user with unread count.
- * Maps to: GET /api/notifications
- */
 export async function fetchNotifications(
   userId?: string,
 ): Promise<{ notifications: Notification[]; unreadCount: number }> {
@@ -308,38 +300,26 @@ export async function fetchNotifications(
   return { notifications: data.notifications, unreadCount: data.unreadCount };
 }
 
-/**
- * Mark notifications as read by their IDs.
- * Maps to: PUT /api/notifications  { ids: [...] }
- */
 export async function markNotificationsRead(ids: string[]): Promise<number> {
   const res = await fetch('/api/notifications', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders(),
     body: JSON.stringify({ ids }),
   });
   const data = await handleResponse<{ updated: number }>(res, 'PUT /api/notifications');
   return data.updated;
 }
 
-/**
- * Mark all notifications as read for a given user.
- * Maps to: PUT /api/notifications  { markAll: true, userId }
- */
 export async function markAllNotificationsRead(userId: string): Promise<number> {
   const res = await fetch('/api/notifications', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders(),
     body: JSON.stringify({ markAll: true, userId }),
   });
   const data = await handleResponse<{ updated: number }>(res, 'PUT /api/notifications');
   return data.updated;
 }
 
-/**
- * Create a new notification.
- * Maps to: POST /api/notifications
- */
 export async function createNotification(
   data: {
     type: string;
@@ -352,7 +332,7 @@ export async function createNotification(
 ): Promise<Notification> {
   const res = await fetch('/api/notifications', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders(),
     body: JSON.stringify(data),
   });
   const result = await handleResponse<NotificationResponse>(res, 'POST /api/notifications');
@@ -361,10 +341,6 @@ export async function createNotification(
 
 // ==================== DASHBOARD ====================
 
-/**
- * Fetch aggregated dashboard data.
- * Maps to: GET /api/dashboard
- */
 export async function fetchDashboard(): Promise<DashboardData> {
   const res = await fetch('/api/dashboard');
   return handleResponse<DashboardData>(res, 'GET /api/dashboard');
@@ -372,20 +348,12 @@ export async function fetchDashboard(): Promise<DashboardData> {
 
 // ==================== USERS ====================
 
-/**
- * Fetch all users.
- * Maps to: GET /api/users
- */
 export async function fetchUsers(): Promise<User[]> {
   const res = await fetch('/api/users');
   const data = await handleResponse<UsersResponse>(res, 'GET /api/users');
   return data.users;
 }
 
-/**
- * Create a new user.
- * Maps to: POST /api/users
- */
 export async function createUser(
   data: {
     name: string;
@@ -397,21 +365,17 @@ export async function createUser(
 ): Promise<User> {
   const res = await fetch('/api/users', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders(),
     body: JSON.stringify(data),
   });
   const result = await handleResponse<UserResponse>(res, 'POST /api/users');
   return result.user;
 }
 
-/**
- * Update an existing user. Requires `id` in the data.
- * Maps to: PUT /api/users
- */
 export async function updateUser(id: string, data: Partial<User>): Promise<User> {
   const res = await fetch('/api/users', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders(),
     body: JSON.stringify({ id, ...data }),
   });
   const result = await handleResponse<UserResponse>(res, 'PUT /api/users');
@@ -420,10 +384,6 @@ export async function updateUser(id: string, data: Partial<User>): Promise<User>
 
 // ==================== AUTOMATIONS ====================
 
-/**
- * Fetch all automations.
- * Maps to: GET /api/automations
- */
 export async function fetchAutomations(
   params?: {
     enabledOnly?: boolean;
@@ -439,10 +399,6 @@ export async function fetchAutomations(
   return data.automations;
 }
 
-/**
- * Create a new automation.
- * Maps to: POST /api/automations
- */
 export async function createAutomation(
   data: {
     name: string;
@@ -454,56 +410,42 @@ export async function createAutomation(
 ): Promise<Automation> {
   const res = await fetch('/api/automations', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders(),
     body: JSON.stringify(data),
   });
   return handleResponse<AutomationResponse>(res, 'POST /api/automations');
 }
 
-/**
- * Update an automation (toggle enabled, edit fields).
- * Maps to: PUT /api/automations
- */
 export async function updateAutomation(
   id: string,
   data: Partial<Automation>,
 ): Promise<Automation> {
   const res = await fetch('/api/automations', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders(),
     body: JSON.stringify({ id, ...data }),
   });
   return handleResponse<AutomationResponse>(res, 'PUT /api/automations');
 }
 
-/**
- * Toggle an automation on/off.
- * Maps to: PUT /api/automations  { id, enabled }
- */
 export async function toggleAutomation(id: string, enabled: boolean): Promise<Automation> {
   return updateAutomation(id, { enabled });
 }
 
-/**
- * Delete an automation.
- * Maps to: DELETE /api/automations?id=<id>
- */
 export async function deleteAutomation(id: string): Promise<void> {
   const res = await fetch(`/api/automations?id=${id}`, {
     method: 'DELETE',
+    headers: authHeaders(),
   });
   await handleResponse<{ success: boolean }>(res, `DELETE /api/automations?id=${id}`);
 }
 
 // ==================== SEED ====================
 
-/**
- * Reseed the database (clears all data).
- * Maps to: POST /api/seed
- */
 export async function seedDatabase(): Promise<SeedResponse> {
   const res = await fetch('/api/seed', {
     method: 'POST',
+    headers: authHeaders(),
   });
   return handleResponse<SeedResponse>(res, 'POST /api/seed');
 }
@@ -512,13 +454,10 @@ export async function seedDatabase(): Promise<SeedResponse> {
 
 export interface LoginResponse {
   user: User;
+  token: string;
   message: string;
 }
 
-/**
- * Login with email and password.
- * Maps to: POST /api/auth
- */
 export async function loginUser(
   email: string,
   password: string,
@@ -529,6 +468,12 @@ export async function loginUser(
     body: JSON.stringify({ email, password }),
   });
   return handleResponse<LoginResponse>(res, 'POST /api/auth');
+}
+
+export async function logoutUser(): Promise<void> {
+  await fetch('/api/auth', {
+    method: 'DELETE',
+  });
 }
 
 // ==================== EXPORT ERROR CLASS ====================

@@ -139,8 +139,8 @@ export function LoginPage() {
 
     setLoading(true)
     try {
-      const { user } = await loginUser(email.trim().toLowerCase(), password)
-      login(user)
+      const { user, token } = await loginUser(email.trim().toLowerCase(), password)
+      login(user, token)
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message)
@@ -158,8 +158,8 @@ export function LoginPage() {
     setError('')
     setLoading(true)
     try {
-      const { user } = await loginUser(quickEmail, quickPassword)
-      login(user)
+      const { user, token } = await loginUser(quickEmail, quickPassword)
+      login(user, token)
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message)

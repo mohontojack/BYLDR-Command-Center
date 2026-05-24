@@ -78,7 +78,7 @@ const PRIORITY_ORDER: Record<TaskPriority, number> = {
 
 function TaskRowSkeleton() {
   return (
-    <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-100">
+    <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
       <Skeleton className="h-4 w-4 rounded" />
       <Skeleton className="h-3 w-3 rounded-full" />
       <Skeleton className="h-4 w-48" />
@@ -94,13 +94,13 @@ function TaskRowSkeleton() {
 function EmptyTasks({ status }: { status: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
-      <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center mb-3">
-        <ListTodo className="h-6 w-6 text-slate-400" />
+      <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-3">
+        <ListTodo className="h-6 w-6 text-muted-foreground" />
       </div>
-      <p className="text-sm font-medium text-slate-500">
+      <p className="text-sm font-medium text-muted-foreground">
         No tasks found
       </p>
-      <p className="text-xs text-slate-400 mt-1">
+      <p className="text-xs text-muted-foreground mt-1">
         {status === 'ALL'
           ? 'Create a new task to get started'
           : `No ${status.toLowerCase().replace('_', ' ')} tasks at the moment`}
@@ -291,7 +291,7 @@ function CreateTaskDialog({
                 </div>
                 <Separator />
                 {filteredLeads.length === 0 ? (
-                  <div className="px-2 py-3 text-center text-xs text-slate-400">
+                  <div className="px-2 py-3 text-center text-xs text-muted-foreground">
                     No leads found
                   </div>
                 ) : (
@@ -486,14 +486,14 @@ export default function TasksView() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="shrink-0 border-b border-slate-200 bg-white px-6 py-4">
+      <div className="shrink-0 border-b border-border bg-background px-6 py-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+            <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
               <ListTodo className="h-5 w-5 text-amber-500" />
               Task Board
             </h1>
-            <p className="text-sm text-slate-500 mt-0.5">
+            <p className="text-sm text-muted-foreground mt-0.5">
               {sortedTasks.length} {sortedTasks.length === 1 ? 'task' : 'tasks'}
             </p>
           </div>
@@ -501,7 +501,7 @@ export default function TasksView() {
           <div className="flex items-center gap-3 flex-wrap">
             {/* Search */}
             <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search tasks..."
                 value={searchQuery}
@@ -532,25 +532,25 @@ export default function TasksView() {
             <TabsList className="h-8">
               <TabsTrigger value="ALL" className="text-xs h-6 px-3 gap-1">
                 All
-                <span className="text-[10px] text-slate-400">
+                <span className="text-[10px] text-muted-foreground">
                   {statusCounts['ALL'] || 0}
                 </span>
               </TabsTrigger>
               <TabsTrigger value="PENDING" className="text-xs h-6 px-3 gap-1">
                 Pending
-                <span className="text-[10px] text-slate-400">
+                <span className="text-[10px] text-muted-foreground">
                   {statusCounts['PENDING'] || 0}
                 </span>
               </TabsTrigger>
               <TabsTrigger value="IN_PROGRESS" className="text-xs h-6 px-3 gap-1">
                 In Progress
-                <span className="text-[10px] text-slate-400">
+                <span className="text-[10px] text-muted-foreground">
                   {statusCounts['IN_PROGRESS'] || 0}
                 </span>
               </TabsTrigger>
               <TabsTrigger value="COMPLETED" className="text-xs h-6 px-3 gap-1">
                 Completed
-                <span className="text-[10px] text-slate-400">
+                <span className="text-[10px] text-muted-foreground">
                   {statusCounts['COMPLETED'] || 0}
                 </span>
               </TabsTrigger>
@@ -583,10 +583,10 @@ export default function TasksView() {
       </div>
 
       {/* Task List */}
-      <div className="flex-1 overflow-y-auto bg-white">
+      <div className="flex-1 overflow-y-auto bg-background">
         <ScrollArea className="h-full">
           {loading ? (
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-border">
               {Array.from({ length: 8 }).map((_, i) => (
                 <TaskRowSkeleton key={i} />
               ))}
@@ -594,7 +594,7 @@ export default function TasksView() {
           ) : sortedTasks.length === 0 ? (
             <EmptyTasks status={taskStatusFilter} />
           ) : (
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-border">
               {sortedTasks.map((task) => {
                 const isExpanded = expandedTaskId === task.id;
                 const isDone = task.status === 'COMPLETED' || task.status === 'CANCELLED';
@@ -606,7 +606,7 @@ export default function TasksView() {
                 return (
                   <div
                     key={task.id}
-                    className={`transition-colors ${isDone ? 'bg-slate-50/50' : 'hover:bg-slate-50/80'}`}
+                    className={`transition-colors ${isDone ? 'bg-muted/50' : 'hover:bg-muted/50'}`}
                   >
                     {/* Main Row */}
                     <div className="flex items-center gap-3 px-4 py-3">
@@ -620,7 +620,7 @@ export default function TasksView() {
 
                       {/* Priority Dot */}
                       <span
-                        className={`h-2.5 w-2.5 rounded-full shrink-0 ${priorityInfo?.dot || 'bg-slate-400'}`}
+                        className={`h-2.5 w-2.5 rounded-full shrink-0 ${priorityInfo?.dot || 'bg-muted-foreground'}`}
                         title={priorityInfo?.label || task.priority}
                       />
 
@@ -629,12 +629,12 @@ export default function TasksView() {
                         onClick={() =>
                           setExpandedTaskId(isExpanded ? null : task.id)
                         }
-                        className="shrink-0 p-0.5 rounded hover:bg-slate-200/70 transition-colors"
+                        className="shrink-0 p-0.5 rounded hover:bg-muted transition-colors"
                       >
                         {isExpanded ? (
-                          <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+                          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
                         ) : (
-                          <ChevronRight className="h-3.5 w-3.5 text-slate-400" />
+                          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
                         )}
                       </button>
 
@@ -645,8 +645,8 @@ export default function TasksView() {
                         }
                         className={`text-sm text-left min-w-0 flex-1 truncate ${
                           isDone
-                            ? 'line-through text-slate-400'
-                            : 'text-slate-800 font-medium'
+                            ? 'line-through text-muted-foreground'
+                            : 'text-foreground font-medium'
                         }`}
                       >
                         {task.title}
@@ -656,7 +656,7 @@ export default function TasksView() {
                       {task.lead && (
                         <button
                           onClick={() => handleLeadClick(task.lead!.id)}
-                          className="shrink-0 hidden sm:flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-150 px-2 py-1 rounded transition-colors"
+                          className="shrink-0 hidden sm:flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 px-2 py-1 rounded transition-colors"
                         >
                           <CircleDot className="h-3 w-3" />
                           <span className="truncate max-w-[100px]">
@@ -669,11 +669,11 @@ export default function TasksView() {
                       {task.assignedTo && (
                         <div className="shrink-0 hidden md:flex items-center gap-1.5">
                           <Avatar className="h-5 w-5">
-                            <AvatarFallback className="text-[8px] bg-slate-100 text-slate-500">
+                            <AvatarFallback className="text-[8px] bg-muted text-muted-foreground">
                               {getInitials(task.assignedTo.name)}
                             </AvatarFallback>
                           </Avatar>
-                          <span className="text-xs text-slate-500 truncate max-w-[80px]">
+                          <span className="text-xs text-muted-foreground truncate max-w-[80px]">
                             {task.assignedTo.name.split(' ')[0]}
                           </span>
                         </div>
@@ -687,7 +687,7 @@ export default function TasksView() {
                               ? 'bg-red-50 text-red-600 font-medium'
                               : isTaskDueToday
                                 ? 'bg-orange-50 text-orange-600 font-medium'
-                                : 'text-slate-400'
+                                : 'text-muted-foreground'
                           }`}
                         >
                           {isTaskOverdue && (
@@ -712,7 +712,7 @@ export default function TasksView() {
                       {/* Status Badge */}
                       <Badge
                         variant="secondary"
-                        className={`shrink-0 text-[10px] font-medium h-5 px-2 ${statusInfo?.color || 'bg-slate-100 text-slate-600'}`}
+                        className={`shrink-0 text-[10px] font-medium h-5 px-2 ${statusInfo?.color || 'bg-muted text-muted-foreground'}`}
                       >
                         {statusInfo?.label || task.status}
                       </Badge>
@@ -721,11 +721,11 @@ export default function TasksView() {
                     {/* Expanded Detail */}
                     {isExpanded && task.description && (
                       <div className="px-4 pb-3 pl-[88px]">
-                        <div className="bg-slate-50 rounded-lg p-3 border border-slate-100">
-                          <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">
+                        <div className="bg-muted rounded-lg p-3 border border-border">
+                          <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
                             {task.description}
                           </p>
-                          <div className="flex items-center gap-4 mt-2 text-[11px] text-slate-400">
+                          <div className="flex items-center gap-4 mt-2 text-[11px] text-muted-foreground">
                             <span>Type: {task.type ? task.type.replace('_', ' ') : 'None'}</span>
                             <span>Created: {formatRelativeTime(task.createdAt)}</span>
                             {task.lead && (
@@ -733,7 +733,7 @@ export default function TasksView() {
                                 Lead:{' '}
                                 <button
                                   onClick={() => handleLeadClick(task.lead!.id)}
-                                  className="text-slate-500 hover:text-slate-700 underline underline-offset-2"
+                                  className="text-muted-foreground hover:text-foreground underline underline-offset-2"
                                 >
                                   {getFullName(task.lead.firstName, task.lead.lastName)}
                                 </button>

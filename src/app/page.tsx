@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { AppLayout } from '@/components/app-layout'
 import { LoginPage } from '@/components/login-page'
 import { useAppStore } from '@/lib/store'
+import { setAuthToken } from '@/lib/api'
 import dynamic from 'next/dynamic'
 
 const DashboardView = dynamic(() => import('@/components/dashboard-view'), { ssr: false })
@@ -25,16 +26,17 @@ const viewMap = {
 } as const
 
 export default function Home() {
-  const { isAuthenticated, currentView, currentUser, login, setCurrentView } = useAppStore()
+  const { isAuthenticated, currentView, login } = useAppStore()
 
   // Restore session from localStorage on mount
   useEffect(() => {
     if (!isAuthenticated && typeof window !== 'undefined') {
       try {
         const stored = localStorage.getItem('bldr_user')
-        if (stored) {
+        const storedToken = localStorage.getItem('bldr_token')
+        if (stored && storedToken) {
           const user = JSON.parse(stored)
-          login(user)
+          login(user, storedToken)
         }
       } catch {
         // Invalid stored data, ignore

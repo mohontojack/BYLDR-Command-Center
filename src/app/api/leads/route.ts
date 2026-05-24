@@ -1,6 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { db } from '@/lib/db'
 import { FunnelStage, LeadStatus } from '@prisma/client'
+
+const createLeadSchema = z.object({
+  firstName: z.string().min(1, 'First name is required').max(100),
+  lastName: z.string().min(1, 'Last name is required').max(100),
+  email: z.string().email().max(200).optional().nullable(),
+  phone: z.string().max(30).optional().nullable(),
+  company: z.string().max(200).optional().nullable(),
+  source: z.string().max(50).optional(),
+  funnelStage: z.enum(['AWARENESS','DISCOVERY','EVALUATION','ASSESSMENT','PURCHASE','LOYALTY']).optional(),
+  assignedToId: z.string().optional().nullable(),
+  createdById: z.string().optional().nullable(),
+  tags: z.string().max(500).optional(),
+  notes: z.string().max(2000).optional().nullable(),
+  score: z.number().int().min(0).max(100).optional(),
+})
+
+const updateLeadSchema = z.object({
+  id: z.string().min(1, 'Lead ID is required'),
+  firstName: z.string().max(100).optional(),
+  lastName: z.string().max(100).optional(),
+  email: z.string().email().max(200).optional().nullable(),
+  phone: z.string().max(30).optional().nullable(),
+  company: z.string().max(200).optional().nullable(),
+  source: z.string().max(50).optional(),
+  funnelStage: z.enum(['AWARENESS','DISCOVERY','EVALUATION','ASSESSMENT','PURCHASE','LOYALTY']).optional(),
+  status: z.enum(['ACTIVE','WON','LOST','ARCHIVED']).optional(),
+  score: z.number().int().min(0).max(100).optional(),
+  tags: z.string().max(500).optional(),
+  notes: z.string().max(2000).optional().nullable(),
+  assignedToId: z.string().optional().nullable(),
+  createdById: z.string().optional().nullable(),
+  dayInFunnel: z.number().int().min(1).max(14).optional(),
+  updatedById: z.string().optional(),
+})
 
 // GET /api/leads - List leads with filtering
 export async function GET(request: NextRequest) {
@@ -40,7 +75,9 @@ export async function GET(request: NextRequest) {
       lastName: 'lastName',
       company: 'company',
     }
-    const orderBy = sortField[sort] ? { [sortField[sort]]: order } : { createdAt: 'desc' }
+    const sortKey = sortField[sort] || 'createdAt'
+    const orderDir = order === 'asc' ? 'asc' : 'desc'
+    const orderBy = { [sortKey]: orderDir } as const
 
     const [leads, total] = await Promise.all([
       db.lead.findMany({
@@ -76,39 +113,30 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const {
-      firstName,
-      lastName,
-      email,
-      phone,
-      company,
-      source,
-      funnelStage,
-      assignedToId,
-      createdById,
-      tags,
-      notes,
-      score,
-    } = body
 
-    if (!firstName || !lastName) {
-      return NextResponse.json({ error: 'First name and last name are required' }, { status: 400 })
+    const parsed = createLeadSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0].message },
+        { status: 400 }
+      )
     }
+    const data = parsed.data
 
     const lead = await db.lead.create({
       data: {
-        firstName,
-        lastName,
-        email: email || null,
-        phone: phone || null,
-        company: company || null,
-        source: source || 'NXL BYLDR',
-        funnelStage: funnelStage || 'AWARENESS',
-        assignedToId: assignedToId || null,
-        createdById: createdById || null,
-        tags: tags || '',
-        notes: notes || null,
-        score: score || 0,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email ?? null,
+        phone: data.phone ?? null,
+        company: data.company ?? null,
+        source: data.source || 'NXL BYLDR',
+        funnelStage: data.funnelStage || 'AWARENESS',
+        assignedToId: data.assignedToId ?? null,
+        createdById: data.createdById ?? null,
+        tags: data.tags || '',
+        notes: data.notes ?? null,
+        score: data.score ?? 0,
         enteredAwarenessAt: new Date(),
       },
       include: {
@@ -121,9 +149,9 @@ export async function POST(request: NextRequest) {
     await db.activity.create({
       data: {
         type: 'LEAD_CREATED',
-        description: `New lead created: ${firstName} ${lastName}${company ? ` from ${company}` : ''}`,
+        description: `New lead created: ${data.firstName} ${data.lastName}${data.company ? ` from ${data.company}` : ''}`,
         leadId: lead.id,
-        userId: createdById || null,
+        userId: data.createdById ?? null,
       },
     })
 
@@ -138,11 +166,15 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json()
-    const { id, ...updateData } = body
 
-    if (!id) {
-      return NextResponse.json({ error: 'Lead ID is required' }, { status: 400 })
+    const parsed = updateLeadSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0].message },
+        { status: 400 }
+      )
     }
+    const { id, ...updateData } = parsed.data
 
     const existingLead = await db.lead.findUnique({ where: { id } })
     if (!existingLead) {
@@ -150,9 +182,8 @@ export async function PUT(request: NextRequest) {
     }
 
     // Handle funnel stage changes
-    const stageTimestamps: Partial<Record<string, Date | null>> = {}
-    const stageChanged =
-      updateData.funnelStage && updateData.funnelStage !== existingLead.funnelStage
+    const newStage = updateData.funnelStage || null
+    const stageChanged = newStage && newStage !== existingLead.funnelStage
 
     // Whitelist safe update fields to prevent Prisma errors from unknown fields
     const safeFields: Record<string, unknown> = {}
@@ -163,6 +194,7 @@ export async function PUT(request: NextRequest) {
       }
     }
 
+    const stageTimestamps: Partial<Record<string, Date | null>> = {}
     if (stageChanged) {
       const stageMap: Record<string, string> = {
         AWARENESS: 'enteredAwarenessAt',
@@ -172,7 +204,7 @@ export async function PUT(request: NextRequest) {
         PURCHASE: 'enteredPurchaseAt',
         LOYALTY: 'enteredLoyaltyAt',
       }
-      const timestampField = stageMap[updateData.funnelStage]
+      const timestampField = stageMap[newStage!]
       if (timestampField) {
         stageTimestamps[timestampField] = new Date()
       }
@@ -187,41 +219,46 @@ export async function PUT(request: NextRequest) {
       safeFields.closedAt = new Date()
     }
 
-    const lead = await db.lead.update({
-      where: { id },
-      data: {
-        ...safeFields,
-        ...stageTimestamps,
-      },
-      include: {
-        assignedTo: { select: { id: true, name: true, email: true, avatar: true } },
-        createdBy: { select: { id: true, name: true, email: true } },
-      },
-    })
-
-    // Create activity for stage change
-    if (stageChanged) {
-      await db.activity.create({
+    // Perform updates within a transaction for data consistency
+    const lead = await db.$transaction(async (tx) => {
+      const updatedLead = await tx.lead.update({
+        where: { id },
         data: {
-          type: 'STAGE_CHANGED',
-          description: `${lead.firstName} ${lead.lastName} moved from ${existingLead.funnelStage} → ${updateData.funnelStage}`,
-          leadId: id,
-          userId: updateData.updatedById || null,
-          metadata: JSON.stringify({ from: existingLead.funnelStage, to: updateData.funnelStage }),
+          ...safeFields,
+          ...stageTimestamps,
+        },
+        include: {
+          assignedTo: { select: { id: true, name: true, email: true, avatar: true } },
+          createdBy: { select: { id: true, name: true, email: true } },
         },
       })
 
-      // Update dayInFunnel when stage changes
-      const stageOrder = ['AWARENESS', 'DISCOVERY', 'EVALUATION', 'ASSESSMENT', 'PURCHASE', 'LOYALTY']
-      const currentIndex = stageOrder.indexOf(updateData.funnelStage)
-      const newDayInFunnel = (currentIndex + 1) * 2 + 1
-      if (newDayInFunnel !== existingLead.dayInFunnel) {
-        await db.lead.update({
-          where: { id },
-          data: { dayInFunnel: newDayInFunnel },
+      // Create activity for stage change
+      if (stageChanged) {
+        await tx.activity.create({
+          data: {
+            type: 'STAGE_CHANGED',
+            description: `${updatedLead.firstName} ${updatedLead.lastName} moved from ${existingLead.funnelStage} → ${newStage}`,
+            leadId: id,
+            userId: updateData.updatedById || null,
+            metadata: JSON.stringify({ from: existingLead.funnelStage, to: newStage }),
+          },
         })
+
+        // Update dayInFunnel when stage changes
+        const stageOrder = ['AWARENESS', 'DISCOVERY', 'EVALUATION', 'ASSESSMENT', 'PURCHASE', 'LOYALTY']
+        const currentIndex = stageOrder.indexOf(newStage)
+        const newDayInFunnel = (currentIndex + 1) * 2 + 1
+        if (newDayInFunnel !== existingLead.dayInFunnel) {
+          await tx.lead.update({
+            where: { id },
+            data: { dayInFunnel: newDayInFunnel },
+          })
+        }
       }
-    }
+
+      return updatedLead
+    })
 
     return NextResponse.json({ lead })
   } catch (error) {

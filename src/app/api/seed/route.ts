@@ -66,9 +66,9 @@ export async function POST() {
       { firstName: 'Karen', lastName: 'Whitfield', email: 'karen@purelyyou.shop', phone: '+1 (555) 307-0002', company: 'Purely You Skincare', source: 'CA BYLDRS', funnelStage: 'DISCOVERY', status: 'LOST', dayInFunnel: 3, score: 12, tags: 'beauty,lost,no-response', previousStage: 'DISCOVERY', assignedToId: sal.id, createdById: sal.id, enteredAwarenessAt: daysAgo(8), enteredDiscoveryAt: daysAgo(6), closedAt: daysAgo(3), lastEngagementAt: daysAgo(5), notes: 'Stopped responding.', createdAt: daysAgo(8) },
     ]
 
-    const leads = []
+    const leads: Awaited<ReturnType<typeof db.lead.create>>[] = []
     for (const ld of leadsData) {
-      leads.push(await db.lead.create({ data: ld }))
+      leads.push(await db.lead.create({ data: ld as any }))
     }
 
     // Tasks
@@ -85,9 +85,9 @@ export async function POST() {
       { title: 'Strategy session with Geo - tech stack review', description: 'Review current automation tools.', status: 'PENDING', priority: 'MEDIUM', type: 'follow_up', assignedToId: sal.id, createdById: sal.id, dueDate: daysFromNow(4), createdAt: daysAgo(1) },
     ]
 
-    const tasks = []
+    const tasks: Awaited<ReturnType<typeof db.task.create>>[] = []
     for (const td of tasksData) {
-      tasks.push(await db.task.create({ data: td }))
+      tasks.push(await db.task.create({ data: td as any }))
     }
 
     // Activities
@@ -115,7 +115,7 @@ export async function POST() {
     ]
 
     for (const ad of activitiesData) {
-      await db.activity.create({ data: ad })
+      await db.activity.create({ data: ad as any })
     }
 
     // Notifications
@@ -131,7 +131,7 @@ export async function POST() {
     ]
 
     for (const nd of notificationsData) {
-      await db.notification.create({ data: nd })
+      await db.notification.create({ data: nd as any })
     }
 
     // Automations
@@ -145,7 +145,7 @@ export async function POST() {
     ]
 
     for (const ad of automationsData) {
-      await db.automation.create({ data: ad })
+      await db.automation.create({ data: ad as any })
     }
 
     return NextResponse.json({

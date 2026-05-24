@@ -18,7 +18,8 @@ interface AppState {
   // Auth
   isAuthenticated: boolean;
   currentUser: User | null;
-  login: (user: User) => void;
+  authToken: string | null;
+  login: (user: User, token: string) => void;
   logout: () => void;
 
   // Navigation
@@ -31,7 +32,7 @@ interface AppState {
   selectedTaskId: string | null;
   setSelectedTaskId: (id: string | null) => void;
 
-  // Current user context (simulated — in production would come from auth)
+  // Current user context
   currentUserId: string;
   setCurrentUserId: (id: string) => void;
 
@@ -70,19 +71,28 @@ export const useAppStore = create<AppState>((set) => ({
   // Auth
   isAuthenticated: false,
   currentUser: null,
-  login: (user) => {
+  authToken: null,
+  login: (user, token) => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('bldr_user', JSON.stringify(user));
+      localStorage.setItem('bldr_token', token);
     }
-    set({ isAuthenticated: true, currentUser: user, currentUserId: user.id });
+    // Also set the token in the API layer
+    import('./api').then(({ setAuthToken }) => setAuthToken(token));
+    set({ isAuthenticated: true, currentUser: user, currentUserId: user.id, authToken: token });
   },
   logout: () => {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('bldr_user');
+      localStorage.removeItem('bldr_token');
     }
+    import('./api').then(({ setAuthToken }) => setAuthToken(null));
+    // Call server logout to clear cookie
+    import('./api').then(({ logoutUser }) => logoutUser().catch(() => {}));
     set({
       isAuthenticated: false,
       currentUser: null,
+      authToken: null,
       currentUserId: '',
       currentView: 'dashboard',
       dashboard: null,

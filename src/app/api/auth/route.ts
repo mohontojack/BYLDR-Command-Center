@@ -1,19 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { hash, compare } from 'bcryptjs'
+import { createSessionToken, authResponse } from '@/lib/auth-server'
+import { z } from 'zod'
+
+// Input validation schema
+const loginSchema = z.object({
+  email: z.string().email('Please enter a valid email address'),
+  password: z.string().min(1, 'Password is required'),
+})
 
 // POST /api/auth - Login
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { email, password } = body
-
-    if (!email || !password) {
+    
+    // Validate input with Zod
+    const parsed = loginSchema.safeParse(body)
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: 'Email and password are required' },
+        { error: parsed.error.issues[0].message },
         { status: 400 }
       )
     }
+
+    const { email, password } = parsed.data
 
     const user = await db.user.findUnique({
       where: { email: email.toLowerCase() },
@@ -63,13 +74,20 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Return user data (exclude password)
+    // Return user data (exclude password) + session token
     const { password: _pw, ...safeUser } = user
 
-    return NextResponse.json({
-      user: safeUser,
-      message: 'Login successful',
-    })
+    // Create session token
+    const token = createSessionToken(user)
+
+    return authResponse(
+      {
+        user: safeUser,
+        token,
+        message: 'Login successful',
+      },
+      token
+    )
   } catch (error) {
     console.error('Error during login:', error)
     return NextResponse.json(
@@ -77,4 +95,19 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
+}
+
+// DELETE /api/auth - Logout
+export async function DELETE() {
+  const { cookies } = await import('next/headers')
+  const cookieStore = await cookies()
+  const response = NextResponse.json({ success: true, message: 'Logged out' })
+  response.cookies.set('bldr_session', '', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 0,
+    path: '/',
+  })
+  return response
 }
