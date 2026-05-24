@@ -450,3 +450,42 @@ All routes tested and confirmed working (200/201 status codes):
 - Database re-seeded with new password field
 - Session persists across page reloads via localStorage
 - Demo credentials: sal@vsual.com/sal2024, geo@vsual.com/geo2024
+
+---
+
+## Task 13 - Enhanced Login Landing Page + Git Setup
+**Agent**: Main Developer
+**Status**: ✅ Completed
+
+### Summary
+Enhanced the login/landing page with professional animations, additional form features, and visual polish. Also configured GitHub remote and pushed all code to the repository.
+
+### Deliverables
+
+#### Enhanced Login Page (`src/components/login-page.tsx`)
+- **Animated gradient orbs**: 4 floating orbs on left panel with CSS keyframe animations (bldr-orb-float-1/2/3, bldr-orb-pulse)
+- **Shimmer gradient text**: "Operational Hub" headline with sweeping gradient animation
+- **Staggered animations**: Feature cards and form card slide up with cascading delays
+- **Remember Me checkbox**: Controlled state with emerald-themed styling
+- **Forgot Password link**: Non-functional placeholder next to password label
+- **Email validation**: Regex-based email format validation
+- **Product pill badges**: NXL BYLDR, CA BYLDRS, BYLDRS GUARDIAN displayed in left panel footer
+- **Improved visual polish**: Hover effects (-translate-y-0.5), enhanced shadows, subtle right panel gradient
+- **Demo accounts**: Sal (CSO) and Geo (Tech Lead) quick-access buttons
+
+#### Git Setup
+- Configured remote: `https://github.com/mohontojack/BYLDR-Command-Center.git`
+- Pushed all code to `main` branch
+- Latest commit: `8bd68c0` — enhanced login page
+
+#### Commands Verified
+- `bun run lint` → 0 errors
+- `bun run db:push` → Database in sync
+- `npx next dev -p 3000` → Compiles in ~800ms, all routes return 200
+- `POST /api/auth` → Login with Sal/Geo credentials works correctly
+
+### Notes
+- ESLint: 0 errors
+- Dev server: Compiles successfully (Ready in 818ms)
+- All animations use pure CSS (no framer-motion dependency)
+- Login page: 544 lines (was 327), production-quality polish
