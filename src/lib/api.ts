@@ -135,12 +135,12 @@ export async function fetchLeads(
     page: params?.page,
     limit: params?.limit,
   });
-  const res = await fetch(url);
+  const res = await fetch(url, { headers: authHeaders() });
   return handleResponse<LeadsResponse>(res, 'GET /api/leads');
 }
 
 export async function fetchLead(id: string): Promise<Lead> {
-  const res = await fetch(`/api/leads/${id}`);
+  const res = await fetch(`/api/leads/${id}`, { headers: authHeaders() });
   const data = await handleResponse<LeadResponse>(res, `GET /api/leads/${id}`);
   return data.lead;
 }
@@ -207,12 +207,12 @@ export async function fetchTasks(
     limit: params?.limit,
     includeCompleted: params?.includeCompleted,
   });
-  const res = await fetch(url);
+  const res = await fetch(url, { headers: authHeaders() });
   return handleResponse<TasksResponse>(res, 'GET /api/tasks');
 }
 
 export async function fetchTask(id: string): Promise<Task> {
-  const res = await fetch(`/api/tasks/${id}`);
+  const res = await fetch(`/api/tasks/${id}`, { headers: authHeaders() });
   const data = await handleResponse<TaskResponse>(res, `GET /api/tasks/${id}`);
   return data.task;
 }
@@ -266,7 +266,7 @@ export async function fetchActivities(
     limit: params?.limit,
     page: params?.offset !== undefined ? Math.ceil((params.offset + 1) / (params.limit || 50)) : params?.page,
   });
-  const res = await fetch(url);
+  const res = await fetch(url, { headers: authHeaders() });
   return handleResponse<ActivitiesResponse>(res, 'GET /api/activities');
 }
 
@@ -295,7 +295,7 @@ export async function fetchNotifications(
   userId?: string,
 ): Promise<{ notifications: Notification[]; unreadCount: number }> {
   const url = buildUrl('/api/notifications', { userId });
-  const res = await fetch(url);
+  const res = await fetch(url, { headers: authHeaders() });
   const data = await handleResponse<NotificationsResponse>(res, 'GET /api/notifications');
   return { notifications: data.notifications, unreadCount: data.unreadCount };
 }
@@ -342,14 +342,14 @@ export async function createNotification(
 // ==================== DASHBOARD ====================
 
 export async function fetchDashboard(): Promise<DashboardData> {
-  const res = await fetch('/api/dashboard');
+  const res = await fetch('/api/dashboard', { headers: authHeaders() });
   return handleResponse<DashboardData>(res, 'GET /api/dashboard');
 }
 
 // ==================== USERS ====================
 
 export async function fetchUsers(): Promise<User[]> {
-  const res = await fetch('/api/users');
+  const res = await fetch('/api/users', { headers: authHeaders() });
   const data = await handleResponse<UsersResponse>(res, 'GET /api/users');
   return data.users;
 }
@@ -394,7 +394,7 @@ export async function fetchAutomations(
     enabledOnly: params?.enabledOnly,
     triggerType: params?.triggerType,
   });
-  const res = await fetch(url);
+  const res = await fetch(url, { headers: authHeaders() });
   const data = await handleResponse<AutomationsResponse>(res, 'GET /api/automations');
   return data.automations;
 }

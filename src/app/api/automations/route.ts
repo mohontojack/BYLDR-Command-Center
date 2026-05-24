@@ -1,9 +1,57 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { db } from '@/lib/db'
 import { TriggerType } from '@prisma/client'
+import { requireAuth } from '@/lib/auth-server'
+
+const createAutomationSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(200),
+  description: z.string().max(1000).optional().nullable(),
+  enabled: z.boolean().optional(),
+  triggerType: z.enum([
+    'LEAD_CREATED',
+    'STAGE_CHANGED',
+    'EMAIL_OPENED',
+    'EMAIL_REPLIED',
+    'LINK_CLICKED',
+    'SMS_REPLIED',
+    'CALL_COMPLETED',
+    'FORM_SUBMITTED',
+    'DAYS_IN_FUNNEL',
+    'TASK_OVERDUE',
+    'LEAD_INACTIVE',
+  ]),
+  triggerConfig: z.record(z.string(), z.unknown()).optional(),
+  actions: z.array(z.record(z.string(), z.unknown())).min(1, 'Actions must be a non-empty array'),
+})
+
+const updateAutomationSchema = z.object({
+  id: z.string().min(1, 'Automation ID is required'),
+  name: z.string().min(1).max(200).optional(),
+  description: z.string().max(1000).optional().nullable(),
+  enabled: z.boolean().optional(),
+  triggerType: z.enum([
+    'LEAD_CREATED',
+    'STAGE_CHANGED',
+    'EMAIL_OPENED',
+    'EMAIL_REPLIED',
+    'LINK_CLICKED',
+    'SMS_REPLIED',
+    'CALL_COMPLETED',
+    'FORM_SUBMITTED',
+    'DAYS_IN_FUNNEL',
+    'TASK_OVERDUE',
+    'LEAD_INACTIVE',
+  ]).optional(),
+  triggerConfig: z.record(z.string(), z.unknown()).optional(),
+  actions: z.array(z.record(z.string(), z.unknown())).optional(),
+})
 
 // GET /api/automations - List automations
 export async function GET(request: NextRequest) {
+  const auth = await requireAuth(request)
+  if (auth instanceof NextResponse) return auth
+
   try {
     const { searchParams } = new URL(request.url)
     const enabledOnly = searchParams.get('enabledOnly') === 'true'
@@ -34,29 +82,29 @@ export async function GET(request: NextRequest) {
 
 // POST /api/automations - Create automation
 export async function POST(request: NextRequest) {
+  const auth = await requireAuth(request)
+  if (auth instanceof NextResponse) return auth
+
   try {
     const body = await request.json()
-    const { name, description, enabled, triggerType, triggerConfig, actions } = body
 
-    if (!name || !triggerType || !actions) {
+    const parsed = createAutomationSchema.safeParse(body)
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: 'Name, triggerType, and actions are required' },
+        { error: parsed.error.issues[0].message },
         { status: 400 }
       )
     }
-
-    if (!Array.isArray(actions) || actions.length === 0) {
-      return NextResponse.json({ error: 'Actions must be a non-empty array' }, { status: 400 })
-    }
+    const data = parsed.data
 
     const automation = await db.automation.create({
       data: {
-        name,
-        description: description || null,
-        enabled: enabled !== false,
-        triggerType,
-        triggerConfig: JSON.stringify(triggerConfig || {}),
-        actions: JSON.stringify(actions),
+        name: data.name,
+        description: data.description || null,
+        enabled: data.enabled !== false,
+        triggerType: data.triggerType,
+        triggerConfig: JSON.stringify(data.triggerConfig || {}),
+        actions: JSON.stringify(data.actions),
       },
     })
 
@@ -76,30 +124,41 @@ export async function POST(request: NextRequest) {
 
 // PUT /api/automations - Update automation (toggle, edit)
 export async function PUT(request: NextRequest) {
+  const auth = await requireAuth(request)
+  if (auth instanceof NextResponse) return auth
+
   try {
     const body = await request.json()
-    const { id, ...updateData } = body
 
-    if (!id) {
-      return NextResponse.json({ error: 'Automation ID is required' }, { status: 400 })
+    const parsed = updateAutomationSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0].message },
+        { status: 400 }
+      )
     }
+    const { id, ...updateData } = parsed.data
 
     const existing = await db.automation.findUnique({ where: { id } })
     if (!existing) {
       return NextResponse.json({ error: 'Automation not found' }, { status: 404 })
     }
 
-    // Stringify JSON fields if they're objects
-    if (updateData.triggerConfig && typeof updateData.triggerConfig === 'object') {
-      updateData.triggerConfig = JSON.stringify(updateData.triggerConfig)
-    }
-    if (updateData.actions && typeof updateData.actions === 'object') {
-      updateData.actions = JSON.stringify(updateData.actions)
+    // Build Prisma-safe data with JSON stringified fields
+    const dbData: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(updateData)) {
+      if (key === 'triggerConfig' && value && typeof value === 'object') {
+        dbData[key] = JSON.stringify(value)
+      } else if (key === 'actions' && value && typeof value === 'object') {
+        dbData[key] = JSON.stringify(value)
+      } else {
+        dbData[key] = value
+      }
     }
 
     const automation = await db.automation.update({
       where: { id },
-      data: updateData,
+      data: dbData,
     })
 
     return NextResponse.json({
@@ -115,6 +174,9 @@ export async function PUT(request: NextRequest) {
 
 // DELETE /api/automations - Delete automation
 export async function DELETE(request: NextRequest) {
+  const auth = await requireAuth(request)
+  if (auth instanceof NextResponse) return auth
+
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')

@@ -75,7 +75,7 @@ import {
   ListPlus,
   StickyNote,
   MoreHorizontal,
-  User,
+  User as UserIcon,
   Star,
   Clock,
   ExternalLink,
@@ -890,7 +890,7 @@ export default function LeadsView() {
               </div>
             ) : leads.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-                <User className="h-10 w-10 mb-2 opacity-40" />
+                <UserIcon className="h-10 w-10 mb-2 opacity-40" />
                 <p className="font-medium">No leads found</p>
                 <p className="text-sm">Try adjusting your filters or add a new lead.</p>
               </div>

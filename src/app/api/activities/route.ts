@@ -1,9 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { db } from '@/lib/db'
 import { ActivityType } from '@prisma/client'
+import { requireAuth } from '@/lib/auth-server'
+
+const createActivitySchema = z.object({
+  type: z.enum([
+    'LEAD_CREATED',
+    'STAGE_CHANGED',
+    'EMAIL_SENT',
+    'EMAIL_OPENED',
+    'EMAIL_REPLIED',
+    'SMS_SENT',
+    'SMS_REPLIED',
+    'CALL_MADE',
+    'CALL_COMPLETED',
+    'LINK_CLICKED',
+    'FORM_SUBMITTED',
+    'VIDEO_VIEWED',
+    'NOTE_ADDED',
+    'TASK_CREATED',
+    'TASK_COMPLETED',
+    'TASK_ASSIGNED',
+    'AUTOMATION_TRIGGERED',
+    'FUNNEL_DAY_ADVANCED',
+  ]),
+  description: z.string().min(1, 'Description is required').max(500),
+  leadId: z.string().optional(),
+  userId: z.string().optional(),
+  taskId: z.string().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+})
 
 // GET /api/activities - List activities with filtering
 export async function GET(request: NextRequest) {
+  const auth = await requireAuth(request)
+  if (auth instanceof NextResponse) return auth
+
   try {
     const { searchParams } = new URL(request.url)
     const leadId = searchParams.get('leadId')
@@ -53,22 +86,29 @@ export async function GET(request: NextRequest) {
 
 // POST /api/activities - Create activity
 export async function POST(request: NextRequest) {
+  const auth = await requireAuth(request)
+  if (auth instanceof NextResponse) return auth
+
   try {
     const body = await request.json()
-    const { type, description, leadId, userId, taskId, metadata } = body
 
-    if (!type || !description) {
-      return NextResponse.json({ error: 'Type and description are required' }, { status: 400 })
+    const parsed = createActivitySchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0].message },
+        { status: 400 }
+      )
     }
+    const data = parsed.data
 
     const activity = await db.activity.create({
       data: {
-        type,
-        description,
-        leadId: leadId || null,
-        userId: userId || null,
-        taskId: taskId || null,
-        metadata: metadata ? JSON.stringify(metadata) : '{}',
+        type: data.type,
+        description: data.description,
+        leadId: data.leadId || null,
+        userId: data.userId || null,
+        taskId: data.taskId || null,
+        metadata: data.metadata ? JSON.stringify(data.metadata) : '{}',
       },
       include: {
         user: { select: { id: true, name: true, email: true, avatar: true } },

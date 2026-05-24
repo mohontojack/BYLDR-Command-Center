@@ -1,8 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { db } from '@/lib/db'
+import { requireAuth } from '@/lib/auth-server'
+
+const createNotificationSchema = z.object({
+  type: z.enum([
+    'LEAD_ASSIGNED',
+    'STAGE_CHANGE',
+    'TASK_DUE',
+    'TASK_OVERDUE',
+    'LEAD_ENGAGEMENT',
+    'AUTOMATION_ALERT',
+    'DAILY_SUMMARY',
+    'SYSTEM',
+  ]),
+  title: z.string().min(1, 'Title is required').max(200),
+  message: z.string().min(1, 'Message is required').max(500),
+  userId: z.string().optional(),
+  leadId: z.string().optional(),
+  actionUrl: z.string().optional(),
+})
 
 // GET /api/notifications - List notifications for a user
 export async function GET(request: NextRequest) {
+  const auth = await requireAuth(request)
+  if (auth instanceof NextResponse) return auth
+
   try {
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
@@ -51,6 +74,9 @@ export async function GET(request: NextRequest) {
 
 // PUT /api/notifications - Mark notification(s) as read
 export async function PUT(request: NextRequest) {
+  const auth = await requireAuth(request)
+  if (auth instanceof NextResponse) return auth
+
   try {
     const body = await request.json()
     const { ids, userId, markAll } = body
@@ -81,22 +107,29 @@ export async function PUT(request: NextRequest) {
 
 // POST /api/notifications - Create notification
 export async function POST(request: NextRequest) {
+  const auth = await requireAuth(request)
+  if (auth instanceof NextResponse) return auth
+
   try {
     const body = await request.json()
-    const { type, title, message, userId, leadId, actionUrl } = body
 
-    if (!type || !title || !message) {
-      return NextResponse.json({ error: 'Type, title, and message are required' }, { status: 400 })
+    const parsed = createNotificationSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0].message },
+        { status: 400 }
+      )
     }
+    const data = parsed.data
 
     const notification = await db.notification.create({
       data: {
-        type,
-        title,
-        message,
-        userId: userId || null,
-        leadId: leadId || null,
-        actionUrl: actionUrl || null,
+        type: data.type,
+        title: data.title,
+        message: data.message,
+        userId: data.userId || null,
+        leadId: data.leadId || null,
+        actionUrl: data.actionUrl || null,
       },
       include: {
         lead: { select: { id: true, firstName: true, lastName: true, company: true } },

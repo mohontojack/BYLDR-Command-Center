@@ -1,9 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { db } from '@/lib/db'
 import { TaskStatus, TaskPriority } from '@prisma/client'
+import { requireAuth } from '@/lib/auth-server'
+
+const createTaskSchema = z.object({
+  title: z.string().min(1, 'Title is required').max(200),
+  description: z.string().max(2000).optional(),
+  status: z.enum(['PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']).optional(),
+  priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional(),
+  type: z.string().max(50).optional(),
+  assignedToId: z.string().optional(),
+  createdById: z.string().optional(),
+  leadId: z.string().optional(),
+  dueDate: z.string().optional(),
+  reminderAt: z.string().optional(),
+})
+
+const updateTaskSchema = z.object({
+  id: z.string().min(1, 'Task ID is required'),
+  title: z.string().min(1).max(200).optional(),
+  description: z.string().max(2000).optional().nullable(),
+  status: z.enum(['PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']).optional(),
+  priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional(),
+  type: z.string().max(50).optional(),
+  assignedToId: z.string().optional().nullable(),
+  createdById: z.string().optional().nullable(),
+  leadId: z.string().optional().nullable(),
+  dueDate: z.string().optional().nullable(),
+  reminderAt: z.string().optional().nullable(),
+})
 
 // GET /api/tasks - List tasks with filtering
 export async function GET(request: NextRequest) {
+  const auth = await requireAuth(request)
+  if (auth instanceof NextResponse) return auth
+
   try {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status') as TaskStatus | null
@@ -67,37 +99,33 @@ export async function GET(request: NextRequest) {
 
 // POST /api/tasks - Create task
 export async function POST(request: NextRequest) {
+  const auth = await requireAuth(request)
+  if (auth instanceof NextResponse) return auth
+
   try {
     const body = await request.json()
-    const {
-      title,
-      description,
-      status,
-      priority,
-      type,
-      assignedToId,
-      createdById,
-      leadId,
-      dueDate,
-      reminderAt,
-    } = body
 
-    if (!title) {
-      return NextResponse.json({ error: 'Title is required' }, { status: 400 })
+    const parsed = createTaskSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0].message },
+        { status: 400 }
+      )
     }
+    const data = parsed.data
 
     const task = await db.task.create({
       data: {
-        title,
-        description: description || null,
-        status: status || 'PENDING',
-        priority: priority || 'MEDIUM',
-        type: type || 'follow_up',
-        assignedToId: assignedToId || null,
-        createdById: createdById || null,
-        leadId: leadId || null,
-        dueDate: dueDate ? new Date(dueDate) : null,
-        reminderAt: reminderAt ? new Date(reminderAt) : null,
+        title: data.title,
+        description: data.description || null,
+        status: data.status || 'PENDING',
+        priority: data.priority || 'MEDIUM',
+        type: data.type || 'follow_up',
+        assignedToId: data.assignedToId || null,
+        createdById: data.createdById || null,
+        leadId: data.leadId || null,
+        dueDate: data.dueDate ? new Date(data.dueDate) : null,
+        reminderAt: data.reminderAt ? new Date(data.reminderAt) : null,
       },
       include: {
         assignedTo: { select: { id: true, name: true, email: true, avatar: true } },
@@ -110,21 +138,21 @@ export async function POST(request: NextRequest) {
     await db.activity.create({
       data: {
         type: 'TASK_CREATED',
-        description: `Task created: ${title}`,
-        leadId: leadId || null,
-        userId: createdById || null,
+        description: `Task created: ${data.title}`,
+        leadId: data.leadId || null,
+        userId: data.createdById || null,
         taskId: task.id,
       },
     })
 
     // If task is assigned, create assignment activity
-    if (assignedToId) {
+    if (data.assignedToId) {
       await db.activity.create({
         data: {
           type: 'TASK_ASSIGNED',
-          description: `Task assigned: ${title}`,
-          leadId: leadId || null,
-          userId: assignedToId,
+          description: `Task assigned: ${data.title}`,
+          leadId: data.leadId || null,
+          userId: data.assignedToId,
           taskId: task.id,
         },
       })
@@ -139,13 +167,20 @@ export async function POST(request: NextRequest) {
 
 // PUT /api/tasks - Update task
 export async function PUT(request: NextRequest) {
+  const auth = await requireAuth(request)
+  if (auth instanceof NextResponse) return auth
+
   try {
     const body = await request.json()
-    const { id, ...updateData } = body
 
-    if (!id) {
-      return NextResponse.json({ error: 'Task ID is required' }, { status: 400 })
+    const parsed = updateTaskSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0].message },
+        { status: 400 }
+      )
     }
+    const { id, ...updateData } = parsed.data
 
     const existingTask = await db.task.findUnique({ where: { id } })
     if (!existingTask) {

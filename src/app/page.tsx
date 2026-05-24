@@ -3,8 +3,8 @@
 import { useEffect } from 'react'
 import { AppLayout } from '@/components/app-layout'
 import { LoginPage } from '@/components/login-page'
+import { ErrorBoundary } from '@/components/error-boundary'
 import { useAppStore } from '@/lib/store'
-import { setAuthToken } from '@/lib/api'
 import dynamic from 'next/dynamic'
 
 const DashboardView = dynamic(() => import('@/components/dashboard-view'), { ssr: false })
@@ -52,8 +52,10 @@ export default function Home() {
   const ActiveView = viewMap[currentView]
 
   return (
-    <AppLayout>
-      <ActiveView />
-    </AppLayout>
+    <ErrorBoundary>
+      <AppLayout>
+        <ActiveView />
+      </AppLayout>
+    </ErrorBoundary>
   )
 }

@@ -1,11 +1,18 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/auth-server'
 
 // Pre-computed bcrypt hashes (cost factor 12)
 const SAL_HASH = '$2b$12$hC1SuTuwtHaCOJ07kOuQVe4H9YYOtfYzLKvHLRIY79B4dhWqCoKHC'
 const GEO_HASH = '$2b$12$3hL.DAB78Eu19Rcg9GZXjOxiI48X2h0HKlQoK0SS69eh7ILs6JYYm'
 
 // POST /api/seed - Reset and re-seed the database
-export async function POST() {
+export async function POST(request: NextRequest) {
+  const auth = await requireAuth(request)
+  if (auth instanceof NextResponse) return auth
+  if (auth.role !== 'ADMIN') {
+    return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
+  }
+
   try {
     const { db } = await import('@/lib/db')
 

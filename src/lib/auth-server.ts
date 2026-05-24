@@ -1,11 +1,10 @@
 /**
  * Server-Side Authentication Utilities
  *
- * Provides session validation for API routes and middleware.
+ * Provides session validation for API routes.
  * Uses a simple token-based approach compatible with the localStorage client store.
  */
 
-import { cookies } from 'next/headers'
 import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
 
@@ -62,10 +61,15 @@ export async function getAuthenticatedUser(request: Request): Promise<SessionUse
   // Check Authorization header first
   let token = request.headers.get('authorization')?.replace('Bearer ', '')
 
-  // Fall back to cookie
+  // Fall back to cookie (lazy import to avoid Turbopack graph issues)
   if (!token) {
-    const cookieStore = await cookies()
-    token = cookieStore.get('bldr_session')?.value
+    try {
+      const { cookies } = await import('next/headers')
+      const cookieStore = await cookies()
+      token = cookieStore.get('bldr_session')?.value
+    } catch {
+      // cookies() not available, continue without cookie fallback
+    }
   }
 
   const session = validateSessionToken(token)
@@ -92,7 +96,7 @@ export async function getAuthenticatedUser(request: Request): Promise<SessionUse
 
 /**
  * Middleware helper to require authentication.
- * Returns a 401 response if not authenticated, or null if authenticated.
+ * Returns a 401 response if not authenticated, or the user if authenticated.
  */
 export async function requireAuth(request: Request): Promise<SessionUser | NextResponse> {
   const user = await getAuthenticatedUser(request)

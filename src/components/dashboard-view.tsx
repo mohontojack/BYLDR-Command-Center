@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState, useCallback, type LucideIcon } from 'react';
+import { useEffect, useState, useCallback } from 'react';
+import type { LucideIcon } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
 import { fetchDashboard, updateTask } from '@/lib/api';
 import type { DashboardData, ActivityType, TaskPriority } from '@/lib/types';

@@ -10,9 +10,49 @@ const loginSchema = z.object({
   password: z.string().min(1, 'Password is required'),
 })
 
+// ─── In-memory rate limiter ─────────────────────────────────
+const loginAttempts = new Map<string, { count: number; firstAttempt: number }>()
+const RATE_LIMIT_WINDOW = 15 * 60 * 1000 // 15 minutes
+const MAX_ATTEMPTS = 10
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now()
+  const record = loginAttempts.get(ip)
+  if (!record) return false
+  if (now - record.firstAttempt > RATE_LIMIT_WINDOW) {
+    loginAttempts.delete(ip)
+    return false
+  }
+  return record.count >= MAX_ATTEMPTS
+}
+
+function recordFailedAttempt(ip: string): void {
+  const now = Date.now()
+  const record = loginAttempts.get(ip)
+  if (!record || now - record.firstAttempt > RATE_LIMIT_WINDOW) {
+    loginAttempts.set(ip, { count: 1, firstAttempt: now })
+  } else {
+    record.count++
+  }
+}
+
+function clearFailedAttempts(ip: string): void {
+  loginAttempts.delete(ip)
+}
+
 // POST /api/auth - Login
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting by IP
+    const forwarded = request.headers.get('x-forwarded-for')
+    const ip = forwarded?.split(',')[0]?.trim() || 'unknown'
+    if (isRateLimited(ip)) {
+      return NextResponse.json(
+        { error: 'Too many login attempts. Please try again in 15 minutes.' },
+        { status: 429 }
+      )
+    }
+
     const body = await request.json()
     
     // Validate input with Zod
@@ -39,6 +79,7 @@ export async function POST(request: NextRequest) {
     })
 
     if (!user) {
+      recordFailedAttempt(ip)
       return NextResponse.json(
         { error: 'Invalid email or password' },
         { status: 401 }
@@ -61,6 +102,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!isValid) {
+      recordFailedAttempt(ip)
       return NextResponse.json(
         { error: 'Invalid email or password' },
         { status: 401 }
@@ -73,6 +115,9 @@ export async function POST(request: NextRequest) {
         { status: 403 }
       )
     }
+
+    // Clear rate limit on successful login
+    clearFailedAttempts(ip)
 
     // Return user data (exclude password) + session token
     const { password: _pw, ...safeUser } = user

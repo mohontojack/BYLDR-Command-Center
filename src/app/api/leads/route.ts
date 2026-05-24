@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { FunnelStage, LeadStatus } from '@prisma/client'
+import { requireAuth } from '@/lib/auth-server'
 
 const createLeadSchema = z.object({
   firstName: z.string().min(1, 'First name is required').max(100),
@@ -39,6 +40,9 @@ const updateLeadSchema = z.object({
 
 // GET /api/leads - List leads with filtering
 export async function GET(request: NextRequest) {
+  const auth = await requireAuth(request)
+  if (auth instanceof NextResponse) return auth
+
   try {
     const { searchParams } = new URL(request.url)
     const stage = searchParams.get('stage') as FunnelStage | null
@@ -111,6 +115,9 @@ export async function GET(request: NextRequest) {
 
 // POST /api/leads - Create a new lead
 export async function POST(request: NextRequest) {
+  const auth = await requireAuth(request)
+  if (auth instanceof NextResponse) return auth
+
   try {
     const body = await request.json()
 
@@ -164,6 +171,9 @@ export async function POST(request: NextRequest) {
 
 // PUT /api/leads - Update a lead
 export async function PUT(request: NextRequest) {
+  const auth = await requireAuth(request)
+  if (auth instanceof NextResponse) return auth
+
   try {
     const body = await request.json()
 
@@ -269,6 +279,9 @@ export async function PUT(request: NextRequest) {
 
 // DELETE /api/leads - Archive a lead (set status to ARCHIVED)
 export async function DELETE(request: NextRequest) {
+  const auth = await requireAuth(request)
+  if (auth instanceof NextResponse) return auth
+
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
