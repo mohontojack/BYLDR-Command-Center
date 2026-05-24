@@ -27,6 +27,7 @@ async function seed() {
     data: {
       name: 'Sal',
       email: 'sal@vsual.com',
+      password: 'sal2024',
       role: 'CSO',
       phone: '+1 (555) 100-2001',
       active: true,
@@ -39,6 +40,7 @@ async function seed() {
     data: {
       name: 'Geo',
       email: 'geo@vsual.com',
+      password: 'geo2024',
       role: 'TECH_LEAD',
       phone: '+1 (555) 100-2002',
       active: true,

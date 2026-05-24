@@ -107,6 +107,7 @@ model User {
   id        String   @id @default(cuid())
   name      String
   email     String   @unique
+  password  String   @default("bylder2024")
   role      UserRole @default(CONTRACTOR)
   avatar    String?
   phone     String?

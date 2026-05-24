@@ -15,6 +15,12 @@ import type {
 import type { AppView } from './types';
 
 interface AppState {
+  // Auth
+  isAuthenticated: boolean;
+  currentUser: User | null;
+  login: (user: User) => void;
+  logout: () => void;
+
   // Navigation
   currentView: AppView;
   setCurrentView: (view: AppView) => void;
@@ -61,6 +67,30 @@ interface AppState {
 }
 
 export const useAppStore = create<AppState>((set) => ({
+  // Auth
+  isAuthenticated: false,
+  currentUser: null,
+  login: (user) => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('bldr_user', JSON.stringify(user));
+    }
+    set({ isAuthenticated: true, currentUser: user, currentUserId: user.id });
+  },
+  logout: () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('bldr_user');
+    }
+    set({
+      isAuthenticated: false,
+      currentUser: null,
+      currentUserId: '',
+      currentView: 'dashboard',
+      dashboard: null,
+      notifications: [],
+      users: [],
+    });
+  },
+
   // Navigation
   currentView: 'dashboard',
   setCurrentView: (view) => set({ currentView: view }),

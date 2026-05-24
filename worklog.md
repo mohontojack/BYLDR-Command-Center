@@ -381,3 +381,72 @@ Final integration of all components, type reconciliation across agents, and veri
 - **Sample Data**: 2 users, 13 leads, 22 tasks, 39 activities, 12 notifications, 6 automations
 - **Tech Stack**: Next.js 16, TypeScript, Prisma (SQLite), shadcn/ui, Zustand, Tailwind CSS 4
 - **Total**: ~5,000+ lines of production code
+
+---
+
+## Task 12 - Login Page & Auth System + API Verification
+**Agent**: Main Developer
+**Status**: ✅ Completed
+
+### Summary
+Added a complete login/authentication system with a professional landing page, auth API endpoint, session persistence, and dynamic user context in the app header. Also verified all 10+ API routes for correctness.
+
+### Deliverables
+
+#### Prisma Schema Update (`prisma/schema.prisma`)
+- Added `password` field (String, default "bylder2024") to User model
+- Seed updated with specific passwords: Sal → "sal2024", Geo → "geo2024"
+
+#### Auth API (`src/app/api/auth/route.ts`)
+- POST /api/auth — Email + password authentication
+- Validates email existence, password match, account active status
+- Returns user data with `_count` (assigned leads/tasks) — excludes password
+- Error responses: 400 (missing fields), 401 (invalid credentials), 403 (deactivated), 500 (server error)
+
+#### Zustand Store Update (`src/lib/store.ts`)
+- Added auth state: `isAuthenticated`, `currentUser`
+- `login(user)` — Sets auth state + persists to localStorage
+- `logout()` — Clears auth state, resets view/dashboard/notifications/users, removes from localStorage
+- Session restoration on page load (reads from localStorage)
+
+#### API Layer Update (`src/lib/api.ts`)
+- Added `LoginResponse` type and `loginUser(email, password)` function
+- Maps to POST /api/auth
+
+#### Login Page (`src/components/login-page.tsx`)
+- **Split-screen layout**: Left panel (55% — branding hero, hidden on mobile), Right panel (login form)
+- **Left Panel**: BYLDR logo, gradient dark background with decorative orbs/grid, "14-Day Funnel System" badge, hero text with gradient, 4 feature cards (Funnel Tracking, Smart Automation, Team Coordination, Real-time Dashboard), footer with VSUAL branding
+- **Right Panel**: Welcome back card with email/password form, show/hide password toggle, error display, loading spinner, Sign in button with gradient
+- **Quick Access**: Two demo account buttons (Sal/CSO, Geo/Tech Lead) — clicking auto-fills and submits login
+- **Mobile**: Logo + Command Center shown above form, hero panel hidden
+- **Hydration safety**: `mounted` state check before rendering interactive content
+
+#### Page Router Update (`src/app/page.tsx`)
+- Conditional rendering: Shows `<LoginPage />` when not authenticated, `<AppLayout>` with view router when authenticated
+- Session restoration on mount via localStorage check
+- All 7 views still lazy-loaded via `next/dynamic`
+
+#### App Layout Update (`src/components/app-layout.tsx`)
+- Header avatar now shows dynamic user initials from `currentUser`
+- Dropdown shows actual user name + role (instead of hardcoded "Sal / CSO")
+- Logout button calls `store.logout()` which clears session and returns to login
+- Team link navigates to team view
+
+### API Route Verification
+All routes tested and confirmed working (200/201 status codes):
+- GET /api/dashboard → 200 (aggregated data with parallel queries)
+- GET /api/users → 200 (2 users with _count)
+- GET /api/leads → 200 (13 leads with pagination)
+- POST /api/leads → 201 (creates lead + activity)
+- GET /api/tasks → 200 (22 tasks with pagination)
+- POST /api/tasks → 201 (creates task + activities)
+- GET /api/activities → 200 (39 activities)
+- GET /api/notifications → 200 (12 notifications)
+- GET /api/automations → 200 (6 automations with parsed JSON)
+- POST /api/auth → 200 (login success) / 401 (invalid credentials)
+
+### Notes
+- ESLint: 0 errors
+- Database re-seeded with new password field
+- Session persists across page reloads via localStorage
+- Demo credentials: sal@vsual.com/sal2024, geo@vsual.com/geo2024

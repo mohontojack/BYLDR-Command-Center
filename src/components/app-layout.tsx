@@ -148,6 +148,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     notifications,
     sidebarOpen,
     setSidebarOpen,
+    currentUser,
+    logout,
   } = useAppStore()
 
   // Unread notification count
@@ -246,7 +248,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               >
                 <Avatar className="size-8">
                   <AvatarFallback className="text-xs font-semibold bg-primary text-primary-foreground">
-                    SA
+                    {currentUser?.name
+                      ? currentUser.name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
+                      : '??'}
                   </AvatarFallback>
                 </Avatar>
               </Button>
@@ -254,17 +258,24 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col gap-1">
-                  <p className="text-sm font-medium leading-none">Sal</p>
+                  <p className="text-sm font-medium leading-none">{currentUser?.name || 'User'}</p>
                   <p className="text-xs text-muted-foreground leading-none">
-                    CSO · VSUAL Digital Media
+                    {currentUser?.role || 'Member'} · VSUAL Digital Media
                   </p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>Profile</DropdownMenuItem>
-              <DropdownMenuItem>Settings</DropdownMenuItem>
+              <DropdownMenuItem className="cursor-pointer" onClick={() => setCurrentView('team')}>
+                Team
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem variant="destructive">Log out</DropdownMenuItem>
+              <DropdownMenuItem
+                variant="destructive"
+                className="cursor-pointer"
+                onClick={logout}
+              >
+                Log out
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

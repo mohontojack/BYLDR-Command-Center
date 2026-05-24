@@ -508,6 +508,29 @@ export async function seedDatabase(): Promise<SeedResponse> {
   return handleResponse<SeedResponse>(res, 'POST /api/seed');
 }
 
+// ==================== AUTH ====================
+
+export interface LoginResponse {
+  user: User;
+  message: string;
+}
+
+/**
+ * Login with email and password.
+ * Maps to: POST /api/auth
+ */
+export async function loginUser(
+  email: string,
+  password: string,
+): Promise<LoginResponse> {
+  const res = await fetch('/api/auth', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  return handleResponse<LoginResponse>(res, 'POST /api/auth');
+}
+
 // ==================== EXPORT ERROR CLASS ====================
 
 export { ApiError };
