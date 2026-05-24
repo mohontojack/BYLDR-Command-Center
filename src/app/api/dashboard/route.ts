@@ -27,6 +27,7 @@ export async function GET() {
       unreadNotificationCount,
       funnelConversionData,
       recentNotifications,
+      leadsNeedingFollowUp,
     ] = await Promise.all([
       // Total leads (non-archived)
       db.lead.count({ where: { status: { not: 'ARCHIVED' } } }),
@@ -131,20 +132,20 @@ export async function GET() {
         orderBy: { createdAt: 'desc' },
         take: 5,
       }),
-    ])
 
-    // Get leads needing follow-up today
-    const leadsNeedingFollowUp = await db.lead.findMany({
-      where: {
-        status: 'ACTIVE',
-        nextActionDate: { gte: todayStart, lte: todayEnd },
-      },
-      include: {
-        assignedTo: { select: { id: true, name: true, avatar: true } },
-      },
-      orderBy: { score: 'desc' },
-      take: 10,
-    })
+      // Leads needing follow-up today
+      db.lead.findMany({
+        where: {
+          status: 'ACTIVE',
+          nextActionDate: { gte: todayStart, lte: todayEnd },
+        },
+        include: {
+          assignedTo: { select: { id: true, name: true, avatar: true } },
+        },
+        orderBy: { score: 'desc' },
+        take: 10,
+      }),
+    ])
 
     // Format leads by stage into a clean object
     const stageOrder = ['AWARENESS', 'DISCOVERY', 'EVALUATION', 'ASSESSMENT', 'PURCHASE', 'LOYALTY']

@@ -88,6 +88,17 @@ export const useAppStore = create<AppState>((set) => ({
       dashboard: null,
       notifications: [],
       users: [],
+      selectedLeadId: null,
+      selectedTaskId: null,
+      leadStageFilter: 'ALL',
+      leadStatusFilter: 'ALL',
+      taskStatusFilter: 'ALL',
+      taskPriorityFilter: 'ALL',
+      searchQuery: '',
+      sidebarOpen: true,
+      leadDetailOpen: false,
+      createLeadDialogOpen: false,
+      createTaskDialogOpen: false,
     });
   },
 

@@ -154,6 +154,15 @@ export async function PUT(request: NextRequest) {
     const stageChanged =
       updateData.funnelStage && updateData.funnelStage !== existingLead.funnelStage
 
+    // Whitelist safe update fields to prevent Prisma errors from unknown fields
+    const safeFields: Record<string, unknown> = {}
+    const allowedFields = ['firstName','lastName','email','phone','company','source','funnelStage','status','score','tags','notes','assignedToId','createdById','dayInFunnel']
+    for (const key of allowedFields) {
+      if (updateData[key] !== undefined) {
+        safeFields[key] = updateData[key]
+      }
+    }
+
     if (stageChanged) {
       const stageMap: Record<string, string> = {
         AWARENESS: 'enteredAwarenessAt',
@@ -168,20 +177,20 @@ export async function PUT(request: NextRequest) {
         stageTimestamps[timestampField] = new Date()
       }
       // Track previous stage
-      updateData.previousStage = existingLead.funnelStage
+      safeFields.previousStage = existingLead.funnelStage
       // Update last engagement
-      updateData.lastEngagementAt = new Date()
+      safeFields.lastEngagementAt = new Date()
     }
 
     // Handle status changes to WON/LOST
-    if (updateData.status === 'WON' || updateData.status === 'LOST') {
-      updateData.closedAt = new Date()
+    if (safeFields.status === 'WON' || safeFields.status === 'LOST') {
+      safeFields.closedAt = new Date()
     }
 
     const lead = await db.lead.update({
       where: { id },
       data: {
-        ...updateData,
+        ...safeFields,
         ...stageTimestamps,
       },
       include: {
@@ -246,7 +255,7 @@ export async function DELETE(request: NextRequest) {
 
     await db.activity.create({
       data: {
-        type: 'LEAD_CREATED',
+        type: 'NOTE_ADDED',
         description: `${lead.firstName} ${lead.lastName} has been archived.`,
         leadId: id,
       },

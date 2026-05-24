@@ -152,16 +152,25 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 })
     }
 
+    // Whitelist safe update fields
+    const safeFields: Record<string, unknown> = {}
+    const allowedFields = ['title','description','status','priority','type','assignedToId','createdById','leadId','dueDate','reminderAt']
+    for (const key of allowedFields) {
+      if (updateData[key] !== undefined) {
+        safeFields[key] = updateData[key]
+      }
+    }
+
     // Handle status changes
-    if (updateData.status === 'COMPLETED' && existingTask.status !== 'COMPLETED') {
-      updateData.completedAt = new Date()
-    } else if (updateData.status && updateData.status !== 'COMPLETED') {
-      updateData.completedAt = null
+    if (safeFields.status === 'COMPLETED' && existingTask.status !== 'COMPLETED') {
+      safeFields.completedAt = new Date()
+    } else if (safeFields.status && safeFields.status !== 'COMPLETED') {
+      safeFields.completedAt = null
     }
 
     const task = await db.task.update({
       where: { id },
-      data: updateData,
+      data: safeFields,
       include: {
         assignedTo: { select: { id: true, name: true, email: true, avatar: true } },
         createdBy: { select: { id: true, name: true, email: true } },
@@ -170,7 +179,7 @@ export async function PUT(request: NextRequest) {
     })
 
     // Create activity for task completion
-    if (updateData.status === 'COMPLETED' && existingTask.status !== 'COMPLETED') {
+    if (safeFields.status === 'COMPLETED' && existingTask.status !== 'COMPLETED') {
       await db.activity.create({
         data: {
           type: 'TASK_COMPLETED',

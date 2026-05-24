@@ -6,7 +6,16 @@ import { UserRole } from '@prisma/client'
 export async function GET() {
   try {
     const users = await db.user.findMany({
-      include: {
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        avatar: true,
+        phone: true,
+        active: true,
+        createdAt: true,
+        updatedAt: true,
         _count: {
           select: {
             assignedLeads: true,
@@ -48,6 +57,19 @@ export async function POST(request: NextRequest) {
         phone: phone || null,
         avatar: avatar || null,
         active: true,
+        // Default password 'changeme' (bcrypt cost 12)
+        password: '$2b$12$yZYmZKTpIjIWVKoeF9NzkuDzmPMaIiqFrtYs2qH0Uy50b2EiF28v2',
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        avatar: true,
+        phone: true,
+        active: true,
+        createdAt: true,
+        updatedAt: true,
       },
     })
 
@@ -81,12 +103,24 @@ export async function PUT(request: NextRequest) {
       }
     }
 
+    // Whitelist safe update fields — exclude password and internal fields
+    const safeFields: Record<string, unknown> = {}
+    const allowedFields = ['name','email','role','phone','avatar','active']
+    for (const key of allowedFields) {
+      if (updateData[key] !== undefined) {
+        safeFields[key] = updateData[key]
+      }
+    }
+
     const user = await db.user.update({
       where: { id },
-      data: updateData,
+      data: safeFields,
     })
 
-    return NextResponse.json({ user })
+    // Strip password from response
+    const { password: _pw, ...safeUser } = user
+
+    return NextResponse.json({ user: safeUser })
   } catch (error) {
     console.error('Error updating user:', error)
     return NextResponse.json({ error: 'Failed to update user' }, { status: 500 })

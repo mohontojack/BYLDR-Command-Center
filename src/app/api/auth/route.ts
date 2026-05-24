@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { hash, compare } from 'bcryptjs'
 
 // POST /api/auth - Login
 export async function POST(request: NextRequest) {
@@ -33,7 +34,22 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (user.password !== password) {
+    // Check if password is plaintext (legacy) or hashed — support both during migration
+    const isPlainText = !user.password.startsWith('$2')
+    const isValid = isPlainText
+      ? user.password === password
+      : await compare(password, user.password)
+
+    // Auto-migrate: if valid plaintext password, hash it for next time
+    if (isValid && isPlainText) {
+      const hashedPw = await hash(password, 12)
+      await db.user.update({
+        where: { id: user.id },
+        data: { password: hashedPw },
+      })
+    }
+
+    if (!isValid) {
       return NextResponse.json(
         { error: 'Invalid email or password' },
         { status: 401 }
