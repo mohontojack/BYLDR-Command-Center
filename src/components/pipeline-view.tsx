@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAppStore } from '@/lib/store';
+import { useDebounce } from '@/hooks/use-debounce';
 import { fetchLeads, updateLead, createLead } from '@/lib/api';
 import { FUNNEL_STAGES, SOURCE_OPTIONS, PRIORITY_CONFIG } from '@/lib/constants';
 import {
@@ -85,18 +86,18 @@ function LeadCard({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Card
-          className="cursor-pointer border border-slate-200 bg-white p-3 transition-all duration-200 hover:border-slate-300 hover:shadow-md group"
+          className="cursor-pointer border border-border bg-background p-3 transition-all duration-200 hover:border-border hover:shadow-md group"
           onClick={() => onSelectLead(lead.id)}
         >
           <CardContent className="p-0 space-y-2">
             {/* Header row: Name + Company */}
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
-                <p className="font-semibold text-sm text-slate-900 truncate leading-tight">
+                <p className="font-semibold text-sm text-foreground truncate leading-tight">
                   {getFullName(lead.firstName, lead.lastName)}
                 </p>
                 {lead.company && (
-                  <p className="text-xs text-slate-500 truncate mt-0.5">
+                  <p className="text-xs text-muted-foreground truncate mt-0.5">
                     {lead.company}
                   </p>
                 )}
@@ -107,7 +108,7 @@ function LeadCard({
                 className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
                 onClick={(e) => e.stopPropagation()}
               >
-                <MoreHorizontal className="h-3.5 w-3.5 text-slate-400" />
+                <MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
               </Button>
             </div>
 
@@ -121,13 +122,13 @@ function LeadCard({
               </span>
 
               {/* Day in funnel */}
-              <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded bg-slate-100 text-slate-600">
+              <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded bg-muted text-foreground">
                 Day {lead.dayInFunnel}
               </span>
 
               {/* Source */}
               {lead.source && (
-                <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] rounded bg-slate-50 text-slate-400 border border-slate-100">
+                <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] rounded bg-background text-muted-foreground border border-border">
                   {lead.source}
                 </span>
               )}
@@ -136,13 +137,13 @@ function LeadCard({
             {/* Bottom row: Time + Avatar */}
             <div className="flex items-center justify-between">
               {lead.lastEngagementAt && (
-                <span className="text-[11px] text-slate-400">
+                <span className="text-[11px] text-muted-foreground">
                   {formatRelativeTime(lead.lastEngagementAt)}
                 </span>
               )}
               {lead.assignedTo && (
                 <Avatar className="h-5 w-5 ml-auto">
-                  <AvatarFallback className="text-[8px] bg-slate-100 text-slate-500">
+                  <AvatarFallback className="text-[8px] bg-muted text-muted-foreground">
                     {getInitials(lead.assignedTo.name)}
                   </AvatarFallback>
                 </Avatar>
@@ -158,7 +159,7 @@ function LeadCard({
           <>
             <DropdownMenuItem
               onClick={() => onStageChange(lead.id, prevStage.key)}
-              className="gap-2 text-slate-600"
+              className="gap-2 text-foreground"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
               Move to {prevStage.label}
@@ -191,7 +192,7 @@ function LeadCard({
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() => onStageChange(lead.id, nextStage.key)}
-              className="gap-2 text-slate-600 font-medium"
+              className="gap-2 text-foreground font-medium"
             >
               <ArrowRight className="h-3.5 w-3.5" />
               Move to {nextStage.label}
@@ -207,7 +208,7 @@ function LeadCard({
 
 function LeadCardSkeleton() {
   return (
-    <Card className="border border-slate-200 bg-white p-3">
+    <Card className="border border-border bg-background p-3">
       <CardContent className="p-0 space-y-2">
         <div className="flex items-start gap-2">
           <div className="flex-1 space-y-1">
@@ -234,10 +235,10 @@ function LeadCardSkeleton() {
 function EmptyStage() {
   return (
     <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
-      <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center mb-2">
-        <Inbox className="h-5 w-5 text-slate-400" />
+      <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center mb-2">
+        <Inbox className="h-5 w-5 text-muted-foreground" />
       </div>
-      <p className="text-xs text-slate-400 font-medium">No leads in this stage</p>
+      <p className="text-xs text-muted-foreground font-medium">No leads in this stage</p>
     </div>
   );
 }
@@ -446,13 +447,16 @@ export default function PipelineView() {
   const [loading, setLoading] = useState(true);
   const [movingLeadId, setMovingLeadId] = useState<string | null>(null);
 
+  // Debounce search to avoid excessive API calls
+  const debouncedSearch = useDebounce(searchQuery, 300);
+
   // Fetch leads
   const loadLeads = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetchLeads({
         status: leadStatusFilter,
-        search: searchQuery || undefined,
+        search: debouncedSearch || undefined,
         limit: 100,
       });
       setLeads(res.leads);
@@ -461,7 +465,7 @@ export default function PipelineView() {
     } finally {
       setLoading(false);
     }
-  }, [leadStatusFilter, searchQuery]);
+  }, [leadStatusFilter, debouncedSearch]);
 
   useEffect(() => {
     loadLeads();
@@ -520,17 +524,17 @@ export default function PipelineView() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="shrink-0 border-b border-slate-200 bg-white px-6 py-4">
+      <div className="shrink-0 border-b border-border bg-background px-6 py-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+            <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-emerald-500" />
               Lead Pipeline
             </h1>
-            <p className="text-sm text-slate-500 mt-0.5">
+            <p className="text-sm text-muted-foreground mt-0.5">
               14-Day Funnel System
               {totalLeads > 0 && (
-                <span className="ml-2 text-slate-400">
+                <span className="ml-2 text-muted-foreground">
                   · {totalLeads} {totalLeads === 1 ? 'lead' : 'leads'}
                 </span>
               )}
@@ -540,7 +544,7 @@ export default function PipelineView() {
           <div className="flex items-center gap-3 flex-wrap">
             {/* Search */}
             <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search leads..."
                 value={searchQuery}
@@ -579,7 +583,7 @@ export default function PipelineView() {
       </div>
 
       {/* Kanban Board */}
-      <div className="flex-1 overflow-x-auto overflow-y-hidden bg-slate-50">
+      <div className="flex-1 overflow-x-auto overflow-y-hidden bg-background">
         <div className="flex gap-4 p-4 h-full min-w-max">
           {FUNNEL_STAGES.map((stage) => {
             const stageLeads = leadsByStage[stage.key] || [];
@@ -587,20 +591,20 @@ export default function PipelineView() {
             return (
               <div
                 key={stage.key}
-                className="min-w-[280px] w-[280px] flex flex-col bg-slate-100/60 rounded-xl border border-slate-200/70"
+                className="min-w-[280px] w-[280px] flex flex-col bg-muted/60 rounded-xl border border-border"
               >
                 {/* Column Header */}
-                <div className="shrink-0 px-3 py-2.5 border-b border-slate-200/70">
+                <div className="shrink-0 px-3 py-2.5 border-b border-border">
                   <div className="flex items-center gap-2">
                     <span
                       className={`h-2.5 w-2.5 rounded-full ${stage.color} shrink-0`}
                     />
-                    <h3 className="text-sm font-semibold text-slate-700 flex-1">
+                    <h3 className="text-sm font-semibold text-foreground flex-1">
                       {stage.label}
                     </h3>
                     <Badge
                       variant="secondary"
-                      className="h-5 min-w-[20px] justify-center text-[11px] font-semibold bg-slate-200 text-slate-600 hover:bg-slate-200"
+                      className="h-5 min-w-[20px] justify-center text-[11px] font-semibold bg-border text-foreground hover:bg-border"
                     >
                       {stageLeads.length}
                     </Badge>

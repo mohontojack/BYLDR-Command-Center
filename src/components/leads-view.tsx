@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAppStore } from '@/lib/store';
+import { useDebounce } from '@/hooks/use-debounce';
 import {
   fetchLeads,
   fetchLead,
@@ -709,6 +710,9 @@ export default function LeadsView() {
   const [stageFilter, setStageFilter] = useState<FunnelStage | 'ALL'>('ALL');
   const [statusFilter, setStatusFilter] = useState<LeadStatus | 'ALL'>('ALL');
 
+  // Debounced search for API
+  const debouncedSearch = useDebounce(search, 300);
+
   // Sort
   const [sortField, setSortField] = useState<SortField>('createdAt');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
@@ -726,7 +730,7 @@ export default function LeadsView() {
       const data = await fetchLeads({
         stage: stageFilter,
         status: statusFilter,
-        search: search || undefined,
+        search: debouncedSearch || undefined,
         sort: sortField,
         order: sortDir,
         limit: 100,
@@ -737,7 +741,7 @@ export default function LeadsView() {
     } finally {
       setLoading(false);
     }
-  }, [stageFilter, statusFilter, search, sortField, sortDir]);
+  }, [stageFilter, statusFilter, debouncedSearch, sortField, sortDir]);
 
   const loadUsers = useCallback(async () => {
     try {

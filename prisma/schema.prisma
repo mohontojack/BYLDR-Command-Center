@@ -107,7 +107,7 @@ model User {
   id        String   @id @default(cuid())
   name      String
   email     String   @unique
-  password  String   @default("bylder2024")
+  password  String   // No default — password required on creation
   role      UserRole @default(CONTRACTOR)
   avatar    String?
   phone     String?
@@ -170,11 +170,9 @@ model Lead {
   activities  Activity[]
   notifications Notification[]
 
-  @@index([funnelStage])
-  @@index([status])
-  @@index([assignedToId])
-  @@index([dayInFunnel])
-  @@index([score])
+  @@index([funnelStage, status])
+  @@index([status, assignedToId])
+  @@index([funnelStage, assignedToId])
   @@map("leads")
 }
 

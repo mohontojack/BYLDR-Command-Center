@@ -337,6 +337,16 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         </main>
       </div>
+
+      {/* ─── STICKY FOOTER ─── */}
+      <footer className="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-muted-foreground">
+        <p>© {new Date().getFullYear()} VSUAL Digital Media. All rights reserved.</p>
+        <div className="flex items-center gap-3">
+          {['NXL BYLDR', 'CA BYLDRS', 'BYLDRS GUARDIAN'].map((product) => (
+            <span key={product} className="hidden sm:inline">{product}</span>
+          ))}
+        </div>
+      </footer>
     </div>
   )
 }

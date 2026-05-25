@@ -79,7 +79,19 @@ export async function PUT(request: NextRequest) {
 
   try {
     const body = await request.json()
-    const { ids, userId, markAll } = body
+
+    // Validate request body
+    const bodySchema = z.object({
+      ids: z.array(z.string()).optional(),
+      userId: z.string().optional(),
+      markAll: z.boolean().optional(),
+    })
+    const parsed = bodySchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+    }
+
+    const { ids, userId, markAll } = parsed.data
 
     if (markAll && userId) {
       // Mark all notifications for a user as read

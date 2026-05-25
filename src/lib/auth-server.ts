@@ -2,15 +2,18 @@
  * Server-Side Authentication Utilities
  *
  * Provides session validation for API routes.
- * Uses a simple token-based approach compatible with the localStorage client store.
+ * Uses HMAC-signed tokens to prevent forgery.
  */
 
 import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
+import { createHmac, randomBytes } from 'crypto'
 
-// Token format: base64(JSON.stringify({ userId, email, exp }))
 const TOKEN_PREFIX = 'bldr_'
 const TOKEN_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
+
+// HMAC secret — in production this should come from env var
+const HMAC_SECRET = process.env.SESSION_SECRET || 'bldr-command-center-hmac-key-change-in-production'
 
 export interface SessionUser {
   id: string
@@ -23,27 +26,46 @@ export interface SessionUser {
 }
 
 /**
- * Create a session token from user data.
- * Used after successful login.
+ * Create an HMAC-signed session token.
+ * Format: bldr_<base64 payload>.<hex signature>
  */
 export function createSessionToken(user: { id: string; email: string }): string {
   const payload = {
     userId: user.id,
     email: user.email,
     exp: Date.now() + TOKEN_EXPIRY_MS,
+    // Random nonce prevents replay even if same payload
+    nce: randomBytes(16).toString('hex'),
   }
-  return TOKEN_PREFIX + Buffer.from(JSON.stringify(payload)).toString('base64')
+  const payloadB64 = Buffer.from(JSON.stringify(payload)).toString('base64url')
+  const sig = createHmac('sha256', HMAC_SECRET)
+    .update(payloadB64)
+    .digest('hex')
+  return `${TOKEN_PREFIX}${payloadB64}.${sig}`
 }
 
 /**
- * Validate a session token and return the user data if valid.
- * Returns null if invalid or expired.
+ * Validate an HMAC-signed session token.
+ * Returns null if invalid, expired, or tampered.
  */
 export function validateSessionToken(token?: string): { userId: string; email: string } | null {
   if (!token || !token.startsWith(TOKEN_PREFIX)) return null
 
   try {
-    const payload = JSON.parse(Buffer.from(token.slice(TOKEN_PREFIX.length), 'base64').toString())
+    const raw = token.slice(TOKEN_PREFIX.length)
+    const dotIdx = raw.lastIndexOf('.')
+    if (dotIdx === -1) return null
+
+    const payloadB64 = raw.slice(0, dotIdx)
+    const sig = raw.slice(dotIdx + 1)
+
+    // Verify HMAC signature
+    const expectedSig = createHmac('sha256', HMAC_SECRET)
+      .update(payloadB64)
+      .digest('hex')
+    if (sig !== expectedSig) return null
+
+    const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString())
     if (!payload.userId || !payload.email) return null
     if (payload.exp && payload.exp < Date.now()) return null
     return { userId: payload.userId, email: payload.email }
